@@ -1,7 +1,6 @@
 import 'package:dotty/screens/recent_screen.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:flutter/services.dart';
 import 'package:flutter_hicons/flutter_hicons.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
@@ -20,8 +19,7 @@ class MainScreen extends StatefulWidget {
   });
 
   @override
-  State<MainScreen> createState() =>
-      _MainScreenState();
+  State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
@@ -34,8 +32,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
 
-    recentWallpapers =
-    List<Wallpaper>.from(widget.recentWallpapers);
+    recentWallpapers = List<Wallpaper>.from(widget.recentWallpapers);
 
     pages = [
       const HomeScreen(),
@@ -55,68 +52,53 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: false,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          IndexedStack(
-            index: currentTab,
-            children: pages,
-          ),
+      extendBody: true,
 
-          SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 16.w,
-                  right: 16.w,
-                  bottom: 16.h,
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(30.r),
-                  ),
-                  child: LiquidGlassBottomNavBar.withImpeller(
-                    selectedIndex: currentTab,
-                    onChanged: (index) {
-                      debugPrint("Tapped: $index");
+      body: IndexedStack(
+        index: currentTab,
+        children: pages,
+      ),
 
-                      HapticFeedback.selectionClick();
+      bottomNavigationBar: SafeArea(
+        minimum: EdgeInsets.fromLTRB(
+          16.w,
+          0,
+          16.w,
+          16.h,
+        ),
+        child: Container(
+          child: LiquidGlassBottomNavBar.withImpeller(
+            selectedIndex: currentTab,
+            onChanged: (index) {
+              HapticFeedback.selectionClick();
 
-                      setState(() {
-                        currentTab = index;
-                      });
-                    },
-                    items: [
-                      const LiquidGlassTabBarItem(
-                        icon: Hicons.home3LightOutline,
-                        label: 'Home',
-                      ),
-                      const LiquidGlassTabBarItem(
-                        icon: Hicons.categoryLightOutline,
-                        label: 'Categories',
-                      ),
-                      const LiquidGlassTabBarItem(
-                        icon: Hicons.heart3LightOutline,
-                        label: 'Saved',
-                      ),
-                      LiquidGlassTabBarItem(
-                        icon: Hicons.leftCircle1LightOutline,
-                        label: recentWallpapers.isEmpty
-                            ? 'Recent'
-                            : 'Recent (${recentWallpapers.length})',
-                      ),
-                    ],
-                  ),
-                ),
+              setState(() {
+                currentTab = index;
+              });
+            },
+            items: [
+              const LiquidGlassTabBarItem(
+                icon: Hicons.home3LightOutline,
+                label: 'Home',
               ),
-            ),
+              const LiquidGlassTabBarItem(
+                icon: Hicons.categoryLightOutline,
+                label: 'Categories',
+              ),
+              const LiquidGlassTabBarItem(
+                icon: Hicons.heart3LightOutline,
+                label: 'Saved',
+              ),
+              LiquidGlassTabBarItem(
+                icon: Hicons.leftCircle1LightOutline,
+                label: recentWallpapers.isEmpty
+                    ? 'Recent'
+                    : 'Recent (${recentWallpapers.length})',
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
-
