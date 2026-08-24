@@ -1,14 +1,15 @@
-import 'package:dotty/onboarding/onboard.dart';
+import 'package:dotty/constants/app_colors.dart';
 import 'package:dotty/onboarding/splash_screen.dart';
-import 'package:dotty/screens/bottom_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'Provider/theme_provider.dart';
+import 'onboarding/onboard.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load();
@@ -16,7 +17,6 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
-
       child: const MyApp(),
     ),
   );
@@ -27,37 +27,181 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final themeProvider =
+    context.watch<ThemeProvider>();
 
     return ScreenUtilInit(
-      // YOUR DESIGN SIZE
-      designSize: const Size(430, 932),
+      designSize:
+      const Size(430, 932),
 
       minTextAdapt: true,
-
       splitScreenMode: true,
 
-      builder: (context, child) {
+      builder:
+          (context, child) {
         return MaterialApp(
-          debugShowCheckedModeBanner: false,
+          debugShowCheckedModeBanner:
+          false,
 
-          themeMode: themeProvider.themeMode,
+          themeMode:
+          themeProvider.themeMode,
 
-          darkTheme: ThemeData(
-            brightness: Brightness.dark,
+          theme:
+          _buildLightTheme(),
 
-            scaffoldBackgroundColor: const Color(0xFF0F1115),
-          ),
+          darkTheme:
+          _buildDarkTheme(),
 
-          theme: ThemeData(
-            brightness: Brightness.light,
-
-            scaffoldBackgroundColor: const Color(0xFFF7F8FC),
-          ),
-
-          home: const SplashScreen(),
+          home:
+          const SplashScreen(),
         );
       },
+    );
+  }
+
+  ThemeData _buildLightTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness:
+      Brightness.light,
+
+      scaffoldBackgroundColor:
+      AppColors.lightBackground,
+
+      colorScheme:
+      const ColorScheme.light(
+        surface:
+        AppColors.lightSurface,
+        primary:
+        AppColors.lightPrimary,
+        secondary:
+        AppColors.accent,
+        onSurface:
+        AppColors.lightPrimary,
+        onPrimary:
+        AppColors.lightSurface,
+        outline:
+        AppColors.lightDivider,
+      ),
+
+      dividerColor:
+      AppColors.lightDivider,
+
+      textTheme:
+      GoogleFonts.interTextTheme(
+        ThemeData
+            .light()
+            .textTheme,
+      ),
+
+      appBarTheme:
+      const AppBarTheme(
+        backgroundColor:
+        Colors.transparent,
+        elevation: 0,
+        surfaceTintColor:
+        Colors.transparent,
+        foregroundColor:
+        AppColors.lightPrimary,
+      ),
+
+      bottomSheetTheme:
+      const BottomSheetThemeData(
+        backgroundColor:
+        AppColors.lightSurface,
+        surfaceTintColor:
+        Colors.transparent,
+        elevation: 0,
+      ),
+
+      cardTheme:
+      CardThemeData(
+        color:
+        AppColors.lightSurface,
+        elevation: 0,
+        surfaceTintColor:
+        Colors.transparent,
+        shape:
+        RoundedRectangleBorder(
+          borderRadius:
+          BorderRadius.all(
+            Radius.circular(28),
+          ),
+        ),
+      ),
+    );
+  }
+
+  ThemeData _buildDarkTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness:
+      Brightness.dark,
+
+      scaffoldBackgroundColor:
+      AppColors.darkBackground,
+
+      colorScheme:
+      const ColorScheme.dark(
+        surface:
+        AppColors.darkSurface,
+        primary:
+        AppColors.darkPrimary,
+        secondary:
+        AppColors.accent,
+        onSurface:
+        AppColors.darkPrimary,
+        onPrimary:
+        AppColors.darkBackground,
+        outline:
+        AppColors.darkDivider,
+      ),
+
+      dividerColor:
+      AppColors.darkDivider,
+
+      textTheme:
+      GoogleFonts.interTextTheme(
+        ThemeData
+            .dark()
+            .textTheme,
+      ),
+
+      appBarTheme:
+      const AppBarTheme(
+        backgroundColor:
+        Colors.transparent,
+        elevation: 0,
+        surfaceTintColor:
+        Colors.transparent,
+        foregroundColor:
+        AppColors.darkPrimary,
+      ),
+
+      bottomSheetTheme:
+      const BottomSheetThemeData(
+        backgroundColor:
+        AppColors.darkSurface,
+        surfaceTintColor:
+        Colors.transparent,
+        elevation: 0,
+      ),
+
+      cardTheme:
+      CardThemeData(
+        color:
+        AppColors.darkSurface,
+        elevation: 0,
+        surfaceTintColor:
+        Colors.transparent,
+        shape:
+        RoundedRectangleBorder(
+          borderRadius:
+          BorderRadius.all(
+            Radius.circular(28),
+          ),
+        ),
+      ),
     );
   }
 }

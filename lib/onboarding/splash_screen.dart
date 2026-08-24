@@ -1,484 +1,529 @@
-import 'dart:convert';
-import 'dart:ui';
+import 'package:dotty/constants/app_colors.dart';
+import 'package:dotty/onboarding/onboard.dart';
+import 'package:dotty/screens/bottom_nav.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../api_servie/wallpaper_Api.dart';
-import '../screens/bottom_nav.dart';
-import 'onboard.dart';
-
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({
+    super.key,
+  });
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  State<SplashScreen> createState() =>
+      _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  final accent = const Color(0xFF7C4DFF);
-
-  String wallpaper = "";
+class _SplashScreenState
+    extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
 
-    loadWallpaper();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 2200,
+      ),
+    )..forward();
+
+    _openApp();
   }
 
-  Future<void> loadWallpaper() async {
-    try {
-      final apiUrl = dotenv.env['API_URL'];
-
-      final response = await http.get(Uri.parse(apiUrl!));
-
-      final data = jsonDecode(response.body);
-
-      List<String> wallpapers = [];
-
-      List<Wallpaper> loadedWallpapers = [];
-
-      data['categories'].forEach((key, value) {
-        final items = List<String>.from(value['wallpapers']);
-
-        wallpapers.addAll(items);
-
-        for (var image in items) {
-          loadedWallpapers.add(
-            Wallpaper(
-              id: image.hashCode.toString(),
-
-              image: image,
-
-              title: "${key} Wallpaper",
-              subtitle: "Premium wallpaper",
-
-              category: key,
-
-              isViewed: false,
-
-              addedAt: DateTime.now(),
-            ),
-          );
-        }
-      });
-
-      wallpapers.shuffle();
-
-      wallpaper = wallpapers.first;
-      recentWallpapers = loadedWallpapers;
-
-      setState(() {});
-
-      await openApp();
-    } catch (e) {
-      debugPrint(e.toString());
-    }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
-  List<Wallpaper> recentWallpapers = [];
+  Future<void> _openApp() async {
+    final prefs =
+    await SharedPreferences.getInstance();
 
-  Future<void> openApp() async {
-    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone =
+        prefs.getBool(
+          'onboarding_done',
+        ) ??
+            false;
 
-    final seen = prefs.getBool('onboarding_done') ?? false;
-
-    // FIRST INSTALL
-    if (!seen) {
-      await prefs.setBool('onboarding_done', true);
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 1200),
-
-          pageBuilder: (_, __, ___) => const OnboardingScreen(),
-
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
-      );
-
-      return;
-    }
-
-    // SPLASH AFTER FIRST INSTALL
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(
+      const Duration(
+        milliseconds: 2400,
+      ),
+    );
 
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
+    final nextScreen = onboardingDone
+        ? const MainScreen(
+      recentWallpapers: [],
+    )
+        : const OnboardingScreen();
 
+    Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 1200),
-
-        pageBuilder: (_, __, ___) =>
-            MainScreen(recentWallpapers: recentWallpapers),
-
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
+        transitionDuration:
+        const Duration(
+          milliseconds: 800,
+        ),
+        pageBuilder:
+            (
+            context,
+            animation,
+            secondaryAnimation,
+            ) =>
+        nextScreen,
+        transitionsBuilder:
+            (
+            context,
+            animation,
+            secondaryAnimation,
+            child,
+            ) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve:
+              Curves.easeOutCubic,
+            ),
+            child: child,
+          );
         },
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget build(
+      BuildContext context,
+      ) {
+    final isDark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
-    final text = isDark ? Colors.white : const Color(0xFF121212);
+    final background = isDark
+        ? AppColors.darkBackground
+        : AppColors.lightBackground;
 
-    final secondary = isDark ? Colors.white70 : Colors.black54;
+    final primary = isDark
+        ? AppColors.darkPrimary
+        : AppColors.lightPrimary;
 
-    final glass = isDark
-        ? Colors.white.withOpacity(.08)
-        : Colors.white.withOpacity(.24);
+    final secondary = isDark
+        ? AppColors.darkSecondary
+        : AppColors.lightSecondary;
+
+    final muted = isDark
+        ? AppColors.darkMuted
+        : AppColors.lightMuted;
+
+    final surface = isDark
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
+
+    final accent =
+        AppColors.accent;
 
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : Colors.white,
+      backgroundColor:
+      background,
 
-      body: wallpaper.isEmpty
-          ? Center(child: CircularProgressIndicator(color: accent))
-          : Stack(
-              fit: StackFit.expand,
-
-              children: [
-                // WALLPAPER
-                Hero(
-                  tag: wallpaper,
-
-                  child: Image.network(wallpaper, fit: BoxFit.cover)
-                      .animate(
-                        onPlay: (c) {
-                          c.repeat(reverse: true);
-                        },
-                      )
-                      .scale(
-                        begin: const Offset(1, 1),
-
-                        end: const Offset(1.08, 1.08),
-
-                        duration: 14.seconds,
+      body: Stack(
+        children: [
+          // Subtle cinematic background
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder:
+                  (context, child) {
+                return DecoratedBox(
+                  decoration:
+                  BoxDecoration(
+                    gradient:
+                    RadialGradient(
+                      center: Alignment(
+                        0,
+                        -.25 +
+                            (_controller.value *
+                                .08),
                       ),
-                ),
-
-                // OVERLAY
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-
-                      end: Alignment.bottomCenter,
-
-                      colors: isDark
-                          ? [
-                              Colors.black.withOpacity(.10),
-
-                              Colors.black.withOpacity(.58),
-
-                              Colors.black.withOpacity(.96),
-                            ]
-                          : [
-                              Colors.white.withOpacity(.10),
-
-                              Colors.white.withOpacity(.56),
-
-                              Colors.white.withOpacity(.92),
-                            ],
-                    ),
-                  ),
-                ),
-
-                // CINEMATIC BLUR
-                BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-
-                  child: Container(color: Colors.transparent),
-                ),
-
-                // ACCENT GLOW
-                Positioned(
-                  top: -120.h,
-
-                  right: -90.w,
-
-                  child:
-                      Container(
-                            width: 360.w,
-
-                            height: 360.h,
-
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-
-                              color: accent.withOpacity(.22),
-                            ),
-                          )
-                          .animate(
-                            onPlay: (c) {
-                              c.repeat(reverse: true);
-                            },
-                          )
-                          .scale(
-                            begin: const Offset(1, 1),
-
-                            end: const Offset(1.18, 1.18),
-
-                            duration: 5.seconds,
-                          )
-                          .blurXY(begin: 100, end: 170),
-                ),
-
-                // SECOND GLOW
-                Positioned(
-                  bottom: -140.h,
-
-                  left: -120.w,
-
-                  child:
-                      Container(
-                            width: 340.w,
-
-                            height: 340.h,
-
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-
-                              color: isDark
-                                  ? Colors.white.withOpacity(.08)
-                                  : accent.withOpacity(.12),
-                            ),
-                          )
-                          .animate(
-                            onPlay: (c) {
-                              c.repeat(reverse: true);
-                            },
-                          )
-                          .scale(
-                            begin: const Offset(1, 1),
-
-                            end: const Offset(1.12, 1.12),
-
-                            duration: 6.seconds,
-                          )
-                          .blurXY(begin: 120, end: 180),
-                ),
-
-                SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 24.w,
-
-                      vertical: 26.h,
-                    ),
-
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-
-                      children: [
-                        // MINI LOGO
-                        Align(
-                          alignment: Alignment.centerRight,
-
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(28.r),
-
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 18.w,
-
-                                  vertical: 10.h,
-                                ),
-
-                                decoration: BoxDecoration(
-                                  color: glass,
-
-                                  borderRadius: BorderRadius.circular(28.r),
-
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(.08),
-                                  ),
-                                ),
-
-                                child: Text(
-                                  "DOTTY",
-
-                                  style: GoogleFonts.inter(
-                                    color: text,
-
-                                    fontWeight: FontWeight.w700,
-
-                                    fontSize: 11.sp,
-
-                                    letterSpacing: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ).animate().fadeIn().moveX(begin: 40, end: 0),
+                      radius: .9,
+                      colors: [
+                        accent.withOpacity(
+                          isDark
+                              ? .035
+                              : .025,
                         ),
-
-                        const Spacer(),
-
-                        // MAIN TITLE
-                        Align(
-                          alignment: Alignment.centerRight,
-
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-
-                            children: [
-                              Text(
-                                    "DOTTY",
-
-                                    textAlign: TextAlign.right,
-
-                                    style: GoogleFonts.bebasNeue(
-                                      color: text,
-
-                                      fontSize: 102.sp,
-
-                                      letterSpacing: 5,
-
-                                      height: .9,
-                                    ),
-                                  )
-                                  .animate()
-                                  .fadeIn(duration: 1000.ms)
-                                  .moveY(
-                                    begin: 50,
-
-                                    end: 0,
-
-                                    curve: Curves.easeOutExpo,
-                                  ),
-
-                              SizedBox(height: 18.h),
-
-                              SizedBox(
-                                width: .72.sw,
-
-                                child: Text(
-                                  "A cinematic wallpaper experience crafted with immersive visuals and fluid ultra modern aesthetics.",
-
-                                  textAlign: TextAlign.right,
-
-                                  style: GoogleFonts.inter(
-                                    color: secondary,
-
-                                    fontSize: 15.sp,
-
-                                    height: 1.9,
-                                  ),
-                                ).animate().fadeIn(delay: 300.ms),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        SizedBox(height: 60.h),
-
-                        // GLASS BOTTOM CARD
-                        ClipRRect(
-                              borderRadius: BorderRadius.circular(36.r),
-
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: 24,
-
-                                  sigmaY: 24,
-                                ),
-
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 22.w,
-
-                                    vertical: 20.h,
-                                  ),
-
-                                  decoration: BoxDecoration(
-                                    color: glass,
-
-                                    borderRadius: BorderRadius.circular(36.r),
-
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(.08),
-                                    ),
-                                  ),
-
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                            width: 24.w,
-
-                                            height: 24.h,
-
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.3,
-
-                                              valueColor:
-                                                  AlwaysStoppedAnimation(
-                                                    accent,
-                                                  ),
-                                            ),
-                                          )
-                                          .animate(
-                                            onPlay: (c) {
-                                              c.repeat();
-                                            },
-                                          )
-                                          .rotate(duration: 2.seconds),
-
-                                      SizedBox(width: 18.w),
-
-                                      Expanded(
-                                        child: Text(
-                                          "Loading immersive experience...",
-
-                                          style: GoogleFonts.inter(
-                                            color: text,
-
-                                            fontSize: 13.sp,
-
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            )
-                            .animate()
-                            .fadeIn(delay: 600.ms)
-                            .moveY(
-                              begin: 40,
-
-                              end: 0,
-
-                              curve: Curves.easeOutExpo,
-                            ),
-
-                        SizedBox(height: 12.h),
+                        background,
                       ],
                     ),
                   ),
-                ),
-              ],
+                );
+              },
             ),
+          ),
+
+          SafeArea(
+            child: Center(
+              child: Padding(
+                padding:
+                EdgeInsets.symmetric(
+                  horizontal: 32.w,
+                ),
+
+                child: Column(
+                  mainAxisAlignment:
+                  MainAxisAlignment.center,
+
+                  children: [
+                    // Minimal frame mark
+                    _FrameIcon(
+                      primary:
+                      primary,
+                      accent:
+                      accent,
+                      surface:
+                      surface,
+                    )
+                        .animate(
+                      controller:
+                      _controller,
+                    )
+                        .fadeIn(
+                      duration:
+                      600.ms,
+                    )
+                        .scale(
+                      begin:
+                      const Offset(
+                        .88,
+                        .88,
+                      ),
+                      end:
+                      const Offset(
+                        1,
+                        1,
+                      ),
+                      duration:
+                      900.ms,
+                      curve:
+                      Curves
+                          .easeOutCubic,
+                    ),
+
+                    SizedBox(
+                      height: 22.h,
+                    ),
+
+                    // Small brand
+                    Text(
+                      'FRAMES',
+                      style:
+                      GoogleFonts.inter(
+                        color:
+                        primary,
+                        fontSize:
+                        22.sp,
+                        fontWeight:
+                        FontWeight.w700,
+                        letterSpacing:
+                        4.5,
+                      ),
+                    )
+                        .animate(
+                      controller:
+                      _controller,
+                    )
+                        .fadeIn(
+                      delay:
+                      250.ms,
+                      duration:
+                      650.ms,
+                    )
+                        .moveY(
+                      begin:
+                      10,
+                      end:
+                      0,
+                      duration:
+                      650.ms,
+                      curve:
+                      Curves
+                          .easeOutCubic,
+                    ),
+
+                    SizedBox(
+                      height: 9.h,
+                    ),
+
+                    Text(
+                      'CURATED WALLPAPERS',
+                      style:
+                      GoogleFonts.inter(
+                        color:
+                        secondary,
+                        fontSize:
+                        8.sp,
+                        fontWeight:
+                        FontWeight.w600,
+                        letterSpacing:
+                        2,
+                      ),
+                    )
+                        .animate(
+                      controller:
+                      _controller,
+                    )
+                        .fadeIn(
+                      delay:
+                      450.ms,
+                      duration:
+                      600.ms,
+                    ),
+
+                    SizedBox(
+                      height: 48.h,
+                    ),
+
+                    // Minimal progress
+                    SizedBox(
+                      width:
+                      110.w,
+                      child:
+                      AnimatedBuilder(
+                        animation:
+                        _controller,
+                        builder:
+                            (
+                            context,
+                            child,
+                            ) {
+                          return Column(
+                            children: [
+                              ClipRRect(
+                                borderRadius:
+                                BorderRadius
+                                    .circular(
+                                  10.r,
+                                ),
+                                child:
+                                Container(
+                                  height:
+                                  2.h,
+                                  color:
+                                  muted
+                                      .withOpacity(
+                                    .15,
+                                  ),
+                                  child:
+                                  Align(
+                                    alignment:
+                                    Alignment
+                                        .centerLeft,
+                                    child:
+                                    FractionallySizedBox(
+                                      widthFactor:
+                                      Curves
+                                          .easeInOut
+                                          .transform(
+                                        _controller
+                                            .value,
+                                      ),
+                                      child:
+                                      Container(
+                                        decoration:
+                                        BoxDecoration(
+                                          color:
+                                          accent,
+                                          borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                            10.r,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              SizedBox(
+                                height:
+                                9.h,
+                              ),
+
+                              Text(
+                                'LOADING',
+                                style:
+                                GoogleFonts
+                                    .inter(
+                                  color:
+                                  muted,
+                                  fontSize:
+                                  7.sp,
+                                  fontWeight:
+                                  FontWeight
+                                      .w600,
+                                  letterSpacing:
+                                  1.8,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    )
+                        .animate(
+                      controller:
+                      _controller,
+                    )
+                        .fadeIn(
+                      delay:
+                      700.ms,
+                      duration:
+                      500.ms,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Bottom version
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 26.h,
+            child: Text(
+              'FRAMES',
+              textAlign:
+              TextAlign.center,
+              style:
+              GoogleFonts.inter(
+                color:
+                muted.withOpacity(
+                  .65,
+                ),
+                fontSize:
+                7.sp,
+                fontWeight:
+                FontWeight.w600,
+                letterSpacing:
+                2,
+              ),
+            )
+                .animate(
+              controller:
+              _controller,
+            )
+                .fadeIn(
+              delay:
+              1100.ms,
+              duration:
+              500.ms,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ================================================================
+// MINIMAL FRAME ICON
+// ================================================================
+
+class _FrameIcon
+    extends StatelessWidget {
+  final Color primary;
+  final Color accent;
+  final Color surface;
+
+  const _FrameIcon({
+    required this.primary,
+    required this.accent,
+    required this.surface,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return SizedBox(
+      width: 62.w,
+      height: 62.w,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration:
+              BoxDecoration(
+                color:
+                surface,
+                border:
+                Border.all(
+                  color:
+                  primary.withOpacity(
+                    .12,
+                  ),
+                ),
+                borderRadius:
+                BorderRadius.circular(
+                  16.r,
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 9.w,
+            top: 9.w,
+            right: 9.w,
+            bottom: 9.w,
+            child: Container(
+              decoration:
+              BoxDecoration(
+                border:
+                Border.all(
+                  color:
+                  accent.withOpacity(
+                    .55,
+                  ),
+                  width: 1.4,
+                ),
+                borderRadius:
+                BorderRadius.circular(
+                  9.r,
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            right: 6.w,
+            bottom: 6.w,
+            child: Container(
+              width: 7.w,
+              height: 7.w,
+              decoration:
+              BoxDecoration(
+                color: accent,
+                borderRadius:
+                BorderRadius.circular(
+                  2.r,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

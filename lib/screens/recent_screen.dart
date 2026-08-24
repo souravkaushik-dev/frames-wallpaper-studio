@@ -1,22 +1,18 @@
-import 'dart:ui';
-
+import 'package:dotty/constants/app_colors.dart';
 import 'package:dotty/screens/previewscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../api_servie/wallpaper_Api.dart';
 
 class RecentPage extends StatefulWidget {
   final List<Wallpaper> recentWallpapers;
-  final Function(List<Wallpaper>) onUpdate;
 
   const RecentPage({
     super.key,
     required this.recentWallpapers,
-    required this.onUpdate,
   });
 
   @override
@@ -25,558 +21,1986 @@ class RecentPage extends StatefulWidget {
 }
 
 class _RecentPageState
-    extends State<RecentPage> {
+    extends State<RecentPage>
+    with SingleTickerProviderStateMixin {
+  late List<Wallpaper> _wallpapers;
+
+  bool _isRefreshing = false;
+
+  // ============================================================
+  // THEME
+  // ============================================================
+
+  bool get _isDark =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _background =>
+      _isDark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground;
+
+  Color get _surface =>
+      _isDark
+          ? AppColors.darkSurface
+          : AppColors.lightSurface;
+
+  Color get _surfaceSoft =>
+      _isDark
+          ? AppColors.darkSurfaceSoft
+          : AppColors.lightSurfaceSoft;
+
+  Color get _primary =>
+      _isDark
+          ? AppColors.darkPrimary
+          : AppColors.lightPrimary;
+
+  Color get _secondary =>
+      _isDark
+          ? AppColors.darkSecondary
+          : AppColors.lightSecondary;
+
+  Color get _muted =>
+      _isDark
+          ? AppColors.darkMuted
+          : AppColors.lightMuted;
+
+  Color get _divider =>
+      _isDark
+          ? AppColors.darkDivider
+          : AppColors.lightDivider;
+
+  Color get _accent =>
+      AppColors.accent;
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
   @override
-  Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness ==
-            Brightness.dark;
+  void initState() {
+    super.initState();
 
-    final bg =
-    isDark
-        ? const Color(0xFF0F1115)
-        : Colors.white;
+    _wallpapers =
+        _filterLastSevenDays(
+          widget.recentWallpapers,
+        );
+  }
 
-    final text =
-    isDark ? Colors.white : Colors.black;
+  @override
+  void didUpdateWidget(
+      covariant RecentPage oldWidget,
+      ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
 
-    final secondary =
-    isDark ? Colors.white60 : Colors.black54;
+    if (oldWidget.recentWallpapers !=
+        widget.recentWallpapers) {
+      _wallpapers =
+          _filterLastSevenDays(
+            widget.recentWallpapers,
+          );
+    }
+  }
 
+  // ============================================================
+  // LAST 7 DAYS FILTER
+  // ============================================================
+
+  List<Wallpaper> _filterLastSevenDays(
+      List<Wallpaper> wallpapers,
+      ) {
+    final now =
+    DateTime.now();
+
+    final sevenDaysAgo =
+    now.subtract(
+      const Duration(
+        days: 7,
+      ),
+    );
+
+    final filtered =
+    wallpapers.where(
+          (wallpaper) {
+        final addedAt =
+            wallpaper.addedAt;
+
+        return !addedAt.isAfter(
+          now,
+        ) &&
+            !addedAt.isBefore(
+              sevenDaysAgo,
+            );
+      },
+    ).toList();
+
+    filtered.sort(
+          (a, b) =>
+          b.addedAt.compareTo(
+            a.addedAt,
+          ),
+    );
+
+    return filtered;
+  }
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  Future<void> _refresh() async {
+    if (_isRefreshing) {
+      return;
+    }
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    await Future.delayed(
+      const Duration(
+        milliseconds: 450,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _wallpapers =
+          _filterLastSevenDays(
+            widget.recentWallpapers,
+          );
+
+      _isRefreshing = false;
+    });
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor:
+      _background,
 
-      body: CustomScrollView(
-        physics:
-        const BouncingScrollPhysics(),
+      body:
+      RefreshIndicator(
+        color:
+        _accent,
 
-        slivers: [
-          // HERO
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                24.w,
-                78.h,
-                24.w,
-                20.h,
-              ),
+        backgroundColor:
+        _surface,
 
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+        strokeWidth:
+        2.2,
 
-                children: [
-                  Text(
-                    "RECENT",
+        onRefresh:
+        _refresh,
 
-                    style:
-                    GoogleFonts.bebasNeue(
-                      color: text,
-                      fontSize: 90.sp,
-                      height: .9,
-                      letterSpacing: 2,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(
-                    duration: 900.ms,
-                  )
-                      .moveY(
-                    begin: 50,
-                    end: 0,
-                  ),
-
-                  SizedBox(height: 14.h),
-
-                  Text(
-                    "Freshly added wallpapers curated for immersive modern setups.",
-
-                    style: GoogleFonts.inter(
-                      color: secondary,
-                      fontSize: 15.sp,
-                      height: 1.8,
-                    ),
-                  ),
-
-                  SizedBox(height: 24.h),
-
-                  Row(
-                    children: [
-                      _glassChip(
-                        icon:
-                        Icons.history_rounded,
-
-                        text:
-                        "${widget.recentWallpapers.length}",
-                      ),
-
-                      SizedBox(width: 12.w),
-
-                      _glassChip(
-                        icon: Icons
-                            .auto_awesome_rounded,
-
-                        text: "Latest",
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+        child:
+        CustomScrollView(
+          physics:
+          const BouncingScrollPhysics(
+            parent:
+            AlwaysScrollableScrollPhysics(),
           ),
 
-          // EMPTY STATE
-          if (widget
-              .recentWallpapers
-              .isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
+          slivers: [
+            // ======================================================
+            // HEADER
+            // ======================================================
 
-              child: Center(
-                child: Column(
-                  mainAxisAlignment:
-                  MainAxisAlignment
-                      .center,
+            SliverToBoxAdapter(
+              child:
+              Padding(
+                padding:
+                EdgeInsets.fromLTRB(
+                  20.w,
+                  22.h,
+                  20.w,
+                  0,
+                ),
 
+                child:
+                Row(
                   children: [
-                    Icon(
-                      Icons
-                          .history_toggle_off_rounded,
+                    _BackButton(
+                      primary:
+                      _primary,
 
-                      color: secondary,
-                      size: 70.sp,
+                      surface:
+                      _surface,
+
+                      divider:
+                      _divider,
+
+                      accent:
+                      _accent,
                     ),
 
-                    SizedBox(height: 18.h),
+                    SizedBox(
+                      width:
+                      15.w,
+                    ),
 
-                    Text(
-                      "No Recent Wallpapers",
+                    Expanded(
+                      child:
+                      Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
 
-                      style:
-                      GoogleFonts.inter(
-                        color: text,
-                        fontSize: 20.sp,
-                        fontWeight:
-                        FontWeight.w700,
+                        children: [
+                          Text(
+                            'FRAMES',
+
+                            style:
+                            GoogleFonts.inter(
+                              color:
+                              _secondary,
+
+                              fontSize:
+                              8.sp,
+
+                              fontWeight:
+                              FontWeight.w800,
+
+                              letterSpacing:
+                              2.1,
+                            ),
+                          ),
+
+                          SizedBox(
+                            height:
+                            3.h,
+                          ),
+
+                          Text(
+                            'Recent',
+
+                            style:
+                            GoogleFonts.inter(
+                              color:
+                              _primary,
+
+                              fontSize:
+                              23.sp,
+
+                              fontWeight:
+                              FontWeight.w800,
+
+                              letterSpacing:
+                              -.6,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
-                    SizedBox(height: 10.h),
+                    _CountBadge(
+                      count:
+                      _wallpapers.length,
 
-                    Text(
-                      "Recently viewed wallpapers will appear here.",
+                      primary:
+                      _primary,
 
-                      textAlign:
-                      TextAlign.center,
+                      accent:
+                      _accent,
 
-                      style:
-                      GoogleFonts.inter(
-                        color: secondary,
-                        fontSize: 14.sp,
-                        height: 1.7,
-                      ),
+                      divider:
+                      _divider,
                     ),
                   ],
                 ),
               ),
-            )
+            ),
 
-          else
-          // GRID
-            SliverPadding(
-              padding:
-              EdgeInsets.symmetric(
-                horizontal: 20.w,
-              ),
+            // ======================================================
+            // HERO
+            // ======================================================
 
-              sliver:
-              SliverMasonryGrid.count(
-                crossAxisCount: 2,
+            SliverToBoxAdapter(
+              child:
+              Padding(
+                padding:
+                EdgeInsets.fromLTRB(
+                  22.w,
+                  44.h,
+                  22.w,
+                  28.h,
+                ),
 
-                mainAxisSpacing: 18.h,
-                crossAxisSpacing: 18.w,
+                child:
+                Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
 
-                childCount: widget
-                    .recentWallpapers
-                    .length,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width:
+                          7.w,
 
-                itemBuilder:
-                    (context, index) {
-                  final wallpaper =
-                  widget
-                      .recentWallpapers[
-                  index];
+                          height:
+                          7.w,
 
-                  final heights = [
-                    340.h,
-                    260.h,
-                    390.h,
-                    300.h,
-                  ];
+                          decoration:
+                          BoxDecoration(
+                            color:
+                            _accent,
 
-                  return GestureDetector(
-                    onTap: () {
-                      final updatedList =
-                      List<Wallpaper>.from(
-                        widget.recentWallpapers,
-                      );
-
-                      updatedList.removeAt(index);
-
-                      setState(() {
-                        widget.recentWallpapers.clear();
-                        widget.recentWallpapers.addAll(
-                          updatedList,
-                        );
-                      });
-
-                      widget.onUpdate(updatedList);
-
-                      Navigator.push(
-                        context,
-
-                        MaterialPageRoute(
-                          builder: (_) => PreviewScreen(
-                            imageUrl: wallpaper.image,
-                            category: wallpaper.category,
+                            shape:
+                            BoxShape
+                                .circle,
                           ),
                         ),
-                      );
-                    },
 
-                    child: Container(
+                        SizedBox(
+                          width:
+                          9.w,
+                        ),
+
+                        Text(
+                          'FRESHLY ADDED',
+
+                          style:
+                          GoogleFonts.inter(
+                            color:
+                            _secondary,
+
+                            fontSize:
+                            8.sp,
+
+                            fontWeight:
+                            FontWeight.w800,
+
+                            letterSpacing:
+                            1.8,
+                          ),
+                        ),
+                      ],
+                    )
+                        .animate()
+                        .fadeIn(
+                      duration:
+                      550.ms,
+                    )
+                        .moveX(
+                      begin:
+                      -18,
+
+                      end:
+                      0,
+
+                      curve:
+                      Curves
+                          .easeOutExpo,
+                    ),
+
+                    SizedBox(
                       height:
-                      heights[index %
-                          4],
+                      13.h,
+                    ),
 
-                      decoration:
-                      BoxDecoration(
-                        borderRadius:
-                        BorderRadius.circular(
-                          42.r,
-                        ),
+                    Text(
+                      'LAST 7 DAYS',
 
-                        image:
-                        DecorationImage(
-                          image:
-                          NetworkImage(
-                            wallpaper
-                                .image,
-                          ),
+                      style:
+                      GoogleFonts.bebasNeue(
+                        color:
+                        _primary,
 
-                          fit:
-                          BoxFit.cover,
-                        ),
+                        fontSize:
+                        76.sp,
+
+                        height:
+                        .76,
+
+                        letterSpacing:
+                        2.5,
+                      ),
+                    )
+                        .animate()
+                        .fadeIn(
+                      delay:
+                      100.ms,
+
+                      duration:
+                      850.ms,
+                    )
+                        .moveY(
+                      begin:
+                      60,
+
+                      end:
+                      0,
+
+                      duration:
+                      900.ms,
+
+                      curve:
+                      Curves
+                          .easeOutExpo,
+                    )
+                        .scale(
+                      begin:
+                      const Offset(
+                        .93,
+                        .93,
                       ),
 
-                      child: Container(
-                        decoration:
-                        BoxDecoration(
-                          borderRadius:
-                          BorderRadius.circular(
-                            42.r,
-                          ),
-
-                          gradient:
-                          LinearGradient(
-                            begin: Alignment
-                                .topCenter,
-
-                            end: Alignment
-                                .bottomCenter,
-
-                            colors: [
-                              Colors
-                                  .transparent,
-
-                              Colors.black
-                                  .withOpacity(
-                                .92,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        child: Padding(
-                          padding:
-                          EdgeInsets.all(
-                            22.w,
-                          ),
-
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
-
-                            children: [
-                              // CATEGORY CHIP
-                              ClipRRect(
-                                borderRadius:
-                                BorderRadius.circular(
-                                  22.r,
-                                ),
-
-                                child:
-                                BackdropFilter(
-                                  filter:
-                                  ImageFilter.blur(
-                                    sigmaX:
-                                    12,
-                                    sigmaY:
-                                    12,
-                                  ),
-
-                                  child:
-                                  Container(
-                                    padding:
-                                    EdgeInsets.symmetric(
-                                      horizontal:
-                                      14.w,
-
-                                      vertical:
-                                      8.h,
-                                    ),
-
-                                    decoration:
-                                    BoxDecoration(
-                                      color: Colors
-                                          .white
-                                          .withOpacity(
-                                        .08,
-                                      ),
-
-                                      borderRadius:
-                                      BorderRadius.circular(
-                                        22.r,
-                                      ),
-
-                                      border:
-                                      Border.all(
-                                        color: Colors
-                                            .white
-                                            .withOpacity(
-                                          .05,
-                                        ),
-                                      ),
-                                    ),
-
-                                    child:
-                                    Text(
-                                      wallpaper
-                                          .category,
-
-                                      style:
-                                      GoogleFonts.inter(
-                                        color:
-                                        Colors.white,
-
-                                        fontSize:
-                                        11.sp,
-
-                                        fontWeight:
-                                        FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const Spacer(),
-
-                              // WALLPAPER NAME
-                              Text(
-                                wallpaper.title.isNotEmpty
-                                    ? wallpaper.title.toUpperCase()
-                                    : getWallpaperName(
-                                  wallpaper.image,
-                                ),
-
-                                maxLines: 2,
-
-                                overflow:
-                                TextOverflow
-                                    .ellipsis,
-
-                                style:
-                                GoogleFonts
-                                    .bebasNeue(
-                                  color: Colors
-                                      .white,
-
-                                  fontSize:
-                                  46.sp,
-
-                                  height: .9,
-
-                                  letterSpacing:
-                                  2,
-                                ),
-                              ),
-
-                              SizedBox(
-                                height: 8.h,
-                              ),
-
-                              // SUBTITLE
-                              Text(
-                                wallpaper
-                                    .subtitle,
-
-                                maxLines: 2,
-
-                                overflow:
-                                TextOverflow
-                                    .ellipsis,
-
-                                style:
-                                GoogleFonts
-                                    .inter(
-                                  color: Colors
-                                      .white70,
-
-                                  fontSize:
-                                  12.sp,
-
-                                  height: 1.7,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      end:
+                      const Offset(
+                        1,
+                        1,
                       ),
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(
-                    delay: Duration(
-                      milliseconds:
-                      index * 100,
+
+                      duration:
+                      900.ms,
+
+                      curve:
+                      Curves
+                          .easeOutExpo,
                     ),
 
-                    duration: 900.ms,
-                  )
-                      .moveY(
-                    begin: 80,
-                    end: 0,
-                    curve:
-                    Curves.easeOutExpo,
-                  )
-                      .scale(
-                    begin:
-                    const Offset(
-                      .9,
-                      .9,
+                    SizedBox(
+                      height:
+                      15.h,
                     ),
 
-                    end:
-                    const Offset(
-                      1,
-                      1,
+                    Text(
+                      _wallpapers.isEmpty
+                          ? 'Nothing new has landed in Frames during the last seven days.'
+                          : 'A cinematic collection of wallpapers added to Frames within the last seven days.',
+
+                      style:
+                      GoogleFonts.inter(
+                        color:
+                        _secondary,
+
+                        fontSize:
+                        13.5.sp,
+
+                        height:
+                        1.75,
+
+                        fontWeight:
+                        FontWeight.w500,
+                      ),
+                    )
+                        .animate()
+                        .fadeIn(
+                      delay:
+                      300.ms,
+
+                      duration:
+                      700.ms,
+                    )
+                        .moveY(
+                      begin:
+                      20,
+
+                      end:
+                      0,
+
+                      curve:
+                      Curves
+                          .easeOutExpo,
                     ),
 
-                    duration:
-                    900.ms,
-                  );
-                },
+                    SizedBox(
+                      height:
+                      24.h,
+                    ),
+
+                    Row(
+                      children: [
+                        _HeroStat(
+                          value:
+                          '${_wallpapers.length}',
+
+                          label:
+                          'NEW',
+
+                          primary:
+                          _primary,
+
+                          secondary:
+                          _secondary,
+                        ),
+
+                        SizedBox(
+                          width:
+                          20.w,
+                        ),
+
+                        Container(
+                          width:
+                          1,
+
+                          height:
+                          28.h,
+
+                          color:
+                          _divider,
+                        ),
+
+                        SizedBox(
+                          width:
+                          20.w,
+                        ),
+
+                        _HeroStat(
+                          value:
+                          '7',
+
+                          label:
+                          'DAYS',
+
+                          primary:
+                          _primary,
+
+                          secondary:
+                          _secondary,
+                        ),
+
+                        SizedBox(
+                          width:
+                          20.w,
+                        ),
+
+                        Container(
+                          width:
+                          1,
+
+                          height:
+                          28.h,
+
+                          color:
+                          _divider,
+                        ),
+
+                        SizedBox(
+                          width:
+                          20.w,
+                        ),
+
+                        _HeroStat(
+                          value:
+                          '4K',
+
+                          label:
+                          'QUALITY',
+
+                          primary:
+                          _primary,
+
+                          secondary:
+                          _secondary,
+                        ),
+                      ],
+                    )
+                        .animate()
+                        .fadeIn(
+                      delay:
+                      450.ms,
+
+                      duration:
+                      700.ms,
+                    )
+                        .moveY(
+                      begin:
+                      18,
+
+                      end:
+                      0,
+
+                      curve:
+                      Curves
+                          .easeOutExpo,
+                    ),
+                  ],
+                ),
               ),
             ),
 
-          SliverToBoxAdapter(
-            child:
-            SizedBox(height: 120.h),
+            // ======================================================
+            // EMPTY STATE
+            // ======================================================
+
+            if (_wallpapers.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody:
+                false,
+
+                child:
+                Padding(
+                  padding:
+                  EdgeInsets.fromLTRB(
+                    20.w,
+                    10.h,
+                    20.w,
+                    80.h,
+                  ),
+
+                  child:
+                  _EmptyState(
+                    primary:
+                    _primary,
+
+                    secondary:
+                    _secondary,
+
+                    muted:
+                    _muted,
+
+                    surface:
+                    _surface,
+
+                    divider:
+                    _divider,
+
+                    accent:
+                    _accent,
+
+                    onRefresh:
+                    _refresh,
+                  ),
+                ),
+              )
+
+            // ======================================================
+            // WALLPAPER GRID
+            // ======================================================
+
+            else
+              SliverPadding(
+                padding:
+                EdgeInsets.fromLTRB(
+                  18.w,
+                  0,
+                  18.w,
+                  100.h,
+                ),
+
+                sliver:
+                SliverGrid(
+                  delegate:
+                  SliverChildBuilderDelegate(
+                        (
+                        context,
+                        index,
+                        ) {
+                      final wallpaper =
+                      _wallpapers[index];
+
+                      return _WallpaperCard(
+                        wallpaper:
+                        wallpaper,
+
+                        index:
+                        index,
+
+                        primary:
+                        _primary,
+
+                        secondary:
+                        _secondary,
+
+                        divider:
+                        _divider,
+
+                        accent:
+                        _accent,
+
+                        surface:
+                        _surface,
+
+                        onTap:
+                            () {
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              transitionDuration:
+                              const Duration(
+                                milliseconds:
+                                600,
+                              ),
+                              reverseTransitionDuration:
+                              const Duration(
+                                milliseconds:
+                                450,
+                              ),
+                              pageBuilder:
+                                  (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  ) {
+                                return PreviewScreen(
+                                  imageUrl:
+                                  wallpaper.image,
+                                  category:
+                                  wallpaper.category,
+                                );
+                              },
+                              transitionsBuilder:
+                                  (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                  ) {
+                                final curved =
+                                CurvedAnimation(
+                                  parent:
+                                  animation,
+                                  curve:
+                                  Curves.easeOutCubic,
+                                );
+
+                                return FadeTransition(
+                                  opacity:
+                                  curved,
+                                  child:
+                                  ScaleTransition(
+                                    scale:
+                                    Tween<double>(
+                                      begin:
+                                      .975,
+                                      end:
+                                      1,
+                                    ).animate(
+                                      curved,
+                                    ),
+                                    child:
+                                    child,
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    childCount:
+                    _wallpapers.length,
+                  ),
+
+                  gridDelegate:
+                  SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount:
+                    2,
+
+                    crossAxisSpacing:
+                    13.w,
+
+                    mainAxisSpacing:
+                    15.h,
+
+                    childAspectRatio:
+                    .66,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// BACK BUTTON
+// ==================================================================
+
+class _BackButton
+    extends StatefulWidget {
+  final Color primary;
+  final Color surface;
+  final Color divider;
+  final Color accent;
+
+  const _BackButton({
+    required this.primary,
+    required this.surface,
+    required this.divider,
+    required this.accent,
+  });
+
+  @override
+  State<_BackButton> createState() =>
+      _BackButtonState();
+}
+
+class _BackButtonState
+    extends State<_BackButton> {
+  bool _pressed =
+  false;
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return GestureDetector(
+      onTapDown:
+          (_) {
+        setState(() {
+          _pressed =
+          true;
+        });
+      },
+
+      onTapCancel:
+          () {
+        setState(() {
+          _pressed =
+          false;
+        });
+      },
+
+      onTapUp:
+          (_) {
+        setState(() {
+          _pressed =
+          false;
+        });
+
+        Navigator.pop(
+          context,
+        );
+      },
+
+      child:
+      AnimatedScale(
+        scale:
+        _pressed
+            ? .88
+            : 1,
+
+        duration:
+        160.ms,
+
+        child:
+        AnimatedContainer(
+          duration:
+          220.ms,
+
+          width:
+          50.w,
+
+          height:
+          50.w,
+
+          decoration:
+          BoxDecoration(
+            color:
+            _pressed
+                ? widget.accent
+                .withOpacity(
+              .07,
+            )
+                : widget.surface,
+
+            shape:
+            BoxShape.circle,
+
+            border:
+            Border.all(
+              color:
+              _pressed
+                  ? widget.accent
+                  .withOpacity(
+                .2,
+              )
+                  : widget.divider,
+            ),
+          ),
+
+          child:
+          Icon(
+            Icons
+                .arrow_back_ios_new_rounded,
+
+            color:
+            widget.primary,
+
+            size:
+            17.sp,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// COUNT BADGE
+// ==================================================================
+
+class _CountBadge
+    extends StatelessWidget {
+  final int count;
+  final Color primary;
+  final Color accent;
+  final Color divider;
+
+  const _CountBadge({
+    required this.count,
+    required this.primary,
+    required this.accent,
+    required this.divider,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Container(
+      padding:
+      EdgeInsets.symmetric(
+        horizontal:
+        12.w,
+
+        vertical:
+        9.h,
+      ),
+
+      decoration:
+      BoxDecoration(
+        color:
+        accent.withOpacity(
+          .05,
+        ),
+
+        borderRadius:
+        BorderRadius.circular(
+          16.r,
+        ),
+
+        border:
+        Border.all(
+          color:
+          divider,
+        ),
+      ),
+
+      child:
+      Row(
+        mainAxisSize:
+        MainAxisSize.min,
+
+        children: [
+          Container(
+            width:
+            6.w,
+
+            height:
+            6.w,
+
+            decoration:
+            BoxDecoration(
+              color:
+              accent,
+
+              shape:
+              BoxShape.circle,
+            ),
+          ),
+
+          SizedBox(
+            width:
+            7.w,
+          ),
+
+          Text(
+            '$count',
+
+            style:
+            GoogleFonts.inter(
+              color:
+              primary,
+
+              fontSize:
+              10.sp,
+
+              fontWeight:
+              FontWeight.w800,
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  String getWallpaperName(
-      String imageUrl,
+// ==================================================================
+// HERO STAT
+// ==================================================================
+
+class _HeroStat
+    extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color primary;
+  final Color secondary;
+
+  const _HeroStat({
+    required this.value,
+    required this.label,
+    required this.primary,
+    required this.secondary,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
       ) {
-    final fileName =
-        imageUrl.split('/').last;
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
 
-    final cleanName =
-    fileName
-        .split('.')
-        .first
-        .replaceAll(
-      RegExp(r'\d+x\d+'),
-      '',
-    )
-        .replaceAll(
-      RegExp(r'\d+'),
-      '',
-    )
-        .replaceAll('-', ' ')
-        .replaceAll('_', ' ')
-        .trim();
+      children: [
+        Text(
+          value,
 
-    return cleanName.toUpperCase();
-  }
+          style:
+          GoogleFonts.bebasNeue(
+            color:
+            primary,
 
-  Widget _glassChip({
-    required IconData icon,
-    required String text,
-  }) {
-    return ClipRRect(
-      borderRadius:
-      BorderRadius.circular(22.r),
+            fontSize:
+            20.sp,
 
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: 12,
-          sigmaY: 12,
+            height:
+            .8,
+
+            letterSpacing:
+            1,
+          ),
         ),
 
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 16.w,
-            vertical: 10.h,
-          ),
+        SizedBox(
+          height:
+          5.h,
+        ),
 
-          decoration: BoxDecoration(
+        Text(
+          label,
+
+          style:
+          GoogleFonts.inter(
             color:
-            Colors.white.withOpacity(
-              .06,
+            secondary.withOpacity(
+              .55,
             ),
 
-            borderRadius:
-            BorderRadius.circular(
-              22.r,
-            ),
+            fontSize:
+            6.5.sp,
 
-            border: Border.all(
-              color:
-              Colors.white.withOpacity(
-                .05,
-              ),
-            ),
+            fontWeight:
+            FontWeight.w800,
+
+            letterSpacing:
+            1.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// WALLPAPER CARD
+// ==================================================================
+
+class _WallpaperCard
+    extends StatefulWidget {
+  final Wallpaper wallpaper;
+  final int index;
+  final Color primary;
+  final Color secondary;
+  final Color divider;
+  final Color accent;
+  final Color surface;
+  final VoidCallback onTap;
+
+  const _WallpaperCard({
+    required this.wallpaper,
+    required this.index,
+    required this.primary,
+    required this.secondary,
+    required this.divider,
+    required this.accent,
+    required this.surface,
+    required this.onTap,
+  });
+
+  @override
+  State<_WallpaperCard> createState() =>
+      _WallpaperCardState();
+}
+
+class _WallpaperCardState
+    extends State<_WallpaperCard> {
+  bool _pressed =
+  false;
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    final wallpaper =
+        widget.wallpaper;
+
+    return GestureDetector(
+      onTapDown:
+          (_) {
+        setState(() {
+          _pressed =
+          true;
+        });
+      },
+
+      onTapCancel:
+          () {
+        setState(() {
+          _pressed =
+          false;
+        });
+      },
+
+      onTapUp:
+          (_) {
+        setState(() {
+          _pressed =
+          false;
+        });
+
+        widget.onTap();
+      },
+
+      child:
+      AnimatedScale(
+        scale:
+        _pressed
+            ? .965
+            : 1,
+
+        duration:
+        180.ms,
+
+        curve:
+        Curves.easeOutCubic,
+
+        child:
+        ClipRRect(
+          borderRadius:
+          BorderRadius.circular(
+            27.r,
           ),
 
-          child: Row(
+          child:
+          Stack(
+            fit:
+            StackFit.expand,
+
             children: [
-              Icon(
-                icon,
-                color: Colors.white70,
-                size: 18.sp,
+              // ====================================================
+              // IMAGE
+              // ====================================================
+
+              Hero(
+                tag:
+                'recent_${wallpaper.id}',
+
+                child:
+                Image.network(
+                  wallpaper.image,
+
+                  fit:
+                  BoxFit.cover,
+
+                  filterQuality:
+                  FilterQuality.medium,
+
+                  errorBuilder:
+                      (
+                      context,
+                      error,
+                      stackTrace,
+                      ) {
+                    return Container(
+                      color:
+                      widget.surface,
+
+                      alignment:
+                      Alignment.center,
+
+                      child:
+                      Icon(
+                        Icons
+                            .image_not_supported_outlined,
+
+                        color:
+                        widget.secondary
+                            .withOpacity(
+                          .5,
+                        ),
+
+                        size:
+                        28.sp,
+                      ),
+                    );
+                  },
+
+                  loadingBuilder:
+                      (
+                      context,
+                      child,
+                      progress,
+                      ) {
+                    if (progress ==
+                        null) {
+                      return child;
+                    }
+
+                    return Container(
+                      color:
+                      widget.surface,
+
+                      alignment:
+                      Alignment.center,
+
+                      child:
+                      SizedBox(
+                        width:
+                        20.w,
+
+                        height:
+                        20.w,
+
+                        child:
+                        CircularProgressIndicator(
+                          strokeWidth:
+                          1.6,
+
+                          value:
+                          progress
+                              .expectedTotalBytes !=
+                              null
+                              ? progress
+                              .cumulativeBytesLoaded /
+                              progress
+                                  .expectedTotalBytes!
+                              : null,
+
+                          color:
+                          widget.accent,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
 
-              SizedBox(width: 8.w),
+              // ====================================================
+              // CINEMATIC GRADIENT
+              // ====================================================
 
-              Text(
-                text,
+              DecoratedBox(
+                decoration:
+                BoxDecoration(
+                  gradient:
+                  LinearGradient(
+                    begin:
+                    Alignment.topCenter,
 
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontWeight:
-                  FontWeight.w600,
-                  fontSize: 12.sp,
+                    end:
+                    Alignment.bottomCenter,
+
+                    stops: const [
+                      0,
+                      .45,
+                      1,
+                    ],
+
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black
+                          .withOpacity(
+                        .72,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ====================================================
+              // TOP LABEL
+              // ====================================================
+
+              Positioned(
+                top:
+                12.h,
+
+                left:
+                12.w,
+
+                child:
+                Container(
+                  padding:
+                  EdgeInsets.symmetric(
+                    horizontal:
+                    10.w,
+
+                    vertical:
+                    6.h,
+                  ),
+
+                  decoration:
+                  BoxDecoration(
+                    color:
+                    Colors.black
+                        .withOpacity(
+                      .28,
+                    ),
+
+                    borderRadius:
+                    BorderRadius.circular(
+                      13.r,
+                    ),
+
+                    border:
+                    Border.all(
+                      color:
+                      Colors.white
+                          .withOpacity(
+                        .12,
+                      ),
+                    ),
+                  ),
+
+                  child:
+                  Text(
+                    'NEW',
+
+                    style:
+                    GoogleFonts.inter(
+                      color:
+                      Colors.white,
+
+                      fontSize:
+                      7.sp,
+
+                      fontWeight:
+                      FontWeight.w800,
+
+                      letterSpacing:
+                      1.2,
+                    ),
+                  ),
+                ),
+              ),
+
+              // ====================================================
+              // BOTTOM CONTENT
+              // ====================================================
+
+              Positioned(
+                left:
+                14.w,
+
+                right:
+                14.w,
+
+                bottom:
+                14.h,
+
+                child:
+                Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+
+                  children: [
+                    Text(
+                      wallpaper.title,
+
+                      maxLines:
+                      1,
+
+                      overflow:
+                      TextOverflow.ellipsis,
+
+                      style:
+                      GoogleFonts.inter(
+                        color:
+                        Colors.white,
+
+                        fontSize:
+                        13.sp,
+
+                        fontWeight:
+                        FontWeight.w800,
+
+                        letterSpacing:
+                        -.2,
+                      ),
+                    ),
+
+                    SizedBox(
+                      height:
+                      4.h,
+                    ),
+
+                    Text(
+                      wallpaper.category,
+
+                      maxLines:
+                      1,
+
+                      overflow:
+                      TextOverflow.ellipsis,
+
+                      style:
+                      GoogleFonts.inter(
+                        color:
+                        Colors.white
+                            .withOpacity(
+                          .68,
+                        ),
+
+                        fontSize:
+                        8.sp,
+
+                        fontWeight:
+                        FontWeight.w600,
+
+                        letterSpacing:
+                        .6,
+                      ),
+                    ),
+
+                    SizedBox(
+                      height:
+                      9.h,
+                    ),
+
+                    Row(
+                      children: [
+                        _GlassTag(
+                          text:
+                          '4K',
+
+                          accent:
+                          widget.accent,
+                        ),
+
+                        SizedBox(
+                          width:
+                          6.w,
+                        ),
+
+                        _GlassTag(
+                          text:
+                          _relativeDate(
+                            wallpaper.addedAt,
+                          ),
+
+                          accent:
+                          widget.accent,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+      ),
+    )
+        .animate()
+        .fadeIn(
+      delay:
+      Duration(
+        milliseconds:
+        70 *
+            (widget.index %
+                8),
+      ),
+
+      duration:
+      650.ms,
+    )
+        .moveY(
+      begin:
+      35,
+
+      end:
+      0,
+
+      duration:
+      700.ms,
+
+      curve:
+      Curves.easeOutExpo,
+    )
+        .scale(
+      begin:
+      const Offset(
+        .94,
+        .94,
+      ),
+
+      end:
+      const Offset(
+        1,
+        1,
+      ),
+
+      duration:
+      700.ms,
+
+      curve:
+      Curves.easeOutExpo,
+    );
+  }
+
+  String _relativeDate(
+      DateTime date,
+      ) {
+    final now =
+    DateTime.now();
+
+    final difference =
+    now.difference(date);
+
+    if (difference.inDays <=
+        0) {
+      if (difference.inHours <=
+          0) {
+        return 'JUST NOW';
+      }
+
+      return '${difference.inHours}H AGO';
+    }
+
+    if (difference.inDays ==
+        1) {
+      return 'YESTERDAY';
+    }
+
+    return '${difference.inDays}D AGO';
+  }
+}
+
+// ==================================================================
+// GLASS TAG
+// ==================================================================
+
+class _GlassTag
+    extends StatelessWidget {
+  final String text;
+  final Color accent;
+
+  const _GlassTag({
+    required this.text,
+    required this.accent,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Container(
+      padding:
+      EdgeInsets.symmetric(
+        horizontal:
+        8.w,
+
+        vertical:
+        5.h,
+      ),
+
+      decoration:
+      BoxDecoration(
+        color:
+        Colors.black
+            .withOpacity(
+          .27,
+        ),
+
+        borderRadius:
+        BorderRadius.circular(
+          10.r,
+        ),
+
+        border:
+        Border.all(
+          color:
+          Colors.white
+              .withOpacity(
+            .11,
+          ),
+        ),
+      ),
+
+      child:
+      Text(
+        text,
+
+        style:
+        GoogleFonts.inter(
+          color:
+          Colors.white
+              .withOpacity(
+            .9,
+          ),
+
+          fontSize:
+          6.5.sp,
+
+          fontWeight:
+          FontWeight.w800,
+
+          letterSpacing:
+          .7,
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// EMPTY STATE
+// ==================================================================
+
+class _EmptyState
+    extends StatelessWidget {
+  final Color primary;
+  final Color secondary;
+  final Color muted;
+  final Color surface;
+  final Color divider;
+  final Color accent;
+  final VoidCallback onRefresh;
+
+  const _EmptyState({
+    required this.primary,
+    required this.secondary,
+    required this.muted,
+    required this.surface,
+    required this.divider,
+    required this.accent,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Center(
+      child:
+      Column(
+        mainAxisAlignment:
+        MainAxisAlignment.center,
+
+        children: [
+          // ========================================================
+          // ICON
+          // ========================================================
+
+          Container(
+            width:
+            82.w,
+
+            height:
+            82.w,
+
+            decoration:
+            BoxDecoration(
+              color:
+              surface,
+
+              shape:
+              BoxShape.circle,
+
+              border:
+              Border.all(
+                color:
+                divider,
+              ),
+            ),
+
+            child:
+            Stack(
+              alignment:
+              Alignment.center,
+
+              children: [
+                Icon(
+                  Icons
+                      .auto_awesome_outlined,
+
+                  color:
+                  muted.withOpacity(
+                    .55,
+                  ),
+
+                  size:
+                  32.sp,
+                ),
+
+                Positioned(
+                  top:
+                  20.h,
+
+                  right:
+                  20.w,
+
+                  child:
+                  Container(
+                    width:
+                    7.w,
+
+                    height:
+                    7.w,
+
+                    decoration:
+                    BoxDecoration(
+                      color:
+                      accent,
+
+                      shape:
+                      BoxShape
+                          .circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+              .animate(
+            onPlay:
+                (controller) =>
+                controller.repeat(
+                  reverse:
+                  true,
+                ),
+          )
+              .scale(
+            begin:
+            const Offset(
+              .94,
+              .94,
+            ),
+
+            end:
+            const Offset(
+              1.04,
+              1.04,
+            ),
+
+            duration:
+            1600.ms,
+
+            curve:
+            Curves
+                .easeInOut,
+          ),
+
+          SizedBox(
+            height:
+            24.h,
+          ),
+
+          Text(
+            'NOTHING NEW YET',
+
+            textAlign:
+            TextAlign.center,
+
+            style:
+            GoogleFonts.bebasNeue(
+              color:
+              primary,
+
+              fontSize:
+              34.sp,
+
+              letterSpacing:
+              1.5,
+            ),
+          )
+              .animate()
+              .fadeIn(
+            duration:
+            600.ms,
+          )
+              .moveY(
+            begin:
+            20,
+
+            end:
+            0,
+
+            curve:
+            Curves
+                .easeOutExpo,
+          ),
+
+          SizedBox(
+            height:
+            8.h,
+          ),
+
+          Padding(
+            padding:
+            EdgeInsets.symmetric(
+              horizontal:
+              40.w,
+            ),
+
+            child:
+            Text(
+              'No wallpapers have been added to Frames during the last seven days.',
+
+              textAlign:
+              TextAlign.center,
+
+              style:
+              GoogleFonts.inter(
+                color:
+                secondary,
+
+                fontSize:
+                12.sp,
+
+                height:
+                1.65,
+
+                fontWeight:
+                FontWeight.w500,
+              ),
+            ),
+          ),
+
+          SizedBox(
+            height:
+            22.h,
+          ),
+
+          GestureDetector(
+            onTap:
+            onRefresh,
+
+            child:
+            Container(
+              padding:
+              EdgeInsets.symmetric(
+                horizontal:
+                17.w,
+
+                vertical:
+                11.h,
+              ),
+
+              decoration:
+              BoxDecoration(
+                color:
+                accent.withOpacity(
+                  .06,
+                ),
+
+                borderRadius:
+                BorderRadius.circular(
+                  16.r,
+                ),
+
+                border:
+                Border.all(
+                  color:
+                  divider,
+                ),
+              ),
+
+              child:
+              Row(
+                mainAxisSize:
+                MainAxisSize.min,
+
+                children: [
+                  Icon(
+                    Icons
+                        .refresh_rounded,
+
+                    color:
+                    primary,
+
+                    size:
+                    16.sp,
+                  ),
+
+                  SizedBox(
+                    width:
+                    7.w,
+                  ),
+
+                  Text(
+                    'CHECK AGAIN',
+
+                    style:
+                    GoogleFonts.inter(
+                      color:
+                      primary,
+
+                      fontSize:
+                      8.sp,
+
+                      fontWeight:
+                      FontWeight.w800,
+
+                      letterSpacing:
+                      1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+              .animate()
+              .fadeIn(
+            delay:
+            400.ms,
+
+            duration:
+            500.ms,
+          )
+              .moveY(
+            begin:
+            12,
+
+            end:
+            0,
+
+            curve:
+            Curves
+                .easeOutExpo,
+          ),
+        ],
       ),
     );
   }

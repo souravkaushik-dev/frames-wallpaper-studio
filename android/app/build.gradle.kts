@@ -1,10 +1,19 @@
-import java.util.Properties
-import java.io.FileInputStream
 
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("dev.flutter.flutter-gradle-plugin")
+import java.util.Properties
+        import java.io.FileInputStream
+
+        plugins {
+            id("com.android.application")
+            id("dev.flutter.flutter-gradle-plugin")
+        }
+
+// Kotlin JVM target
+kotlin {
+    compilerOptions {
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        )
+    }
 }
 
 // Load keystore properties
@@ -15,13 +24,12 @@ val keystorePropertiesFile =
 
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(
-        FileInputStream(
-            keystorePropertiesFile
-        )
+        FileInputStream(keystorePropertiesFile)
     )
 }
+
 android {
-    namespace = "com.studios.dotty"
+    namespace = "com.studios.frames"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -30,50 +38,32 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
-
     defaultConfig {
-        applicationId = "com.studios.dotty"
+        applicationId = "com.studios.frames"
         minSdk = 24
         targetSdk = 36
-        versionCode =
-            flutter.versionCode
-        versionName =
-            flutter.versionName
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     signingConfigs {
-
         create("release") {
+            keyAlias = keystoreProperties["keyAlias"]?.toString()
+            keyPassword = keystoreProperties["keyPassword"]?.toString()
 
-            keyAlias =
-                keystoreProperties["keyAlias"]?.toString()
+            storeFile = keystoreProperties["storeFile"]
+                ?.toString()
+                ?.let { path -> file(path) }
 
-            keyPassword =
-                keystoreProperties["keyPassword"]?.toString()
-
-            storeFile =
-                keystoreProperties["storeFile"]
-                    ?.toString()
-                    ?.let { path ->
-                        file(path)
-                    }
-
-            storePassword =
-                keystoreProperties["storePassword"]?.toString()
+            storePassword = keystoreProperties["storePassword"]?.toString()
         }
     }
+
     buildTypes {
-
         getByName("release") {
-
-            signingConfig =
-                signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("release")
 
             isMinifyEnabled = false
-
             isShrinkResources = false
 
             proguardFiles(
