@@ -12,8 +12,7 @@ class FleckApp extends StatefulWidget {
   });
 
   @override
-  State<FleckApp> createState() =>
-      _FleckAppState();
+  State<FleckApp> createState() => _FleckAppState();
 }
 
 class _FleckAppState extends State<FleckApp> {
@@ -21,8 +20,7 @@ class _FleckAppState extends State<FleckApp> {
   // THEME
   // ===========================================================================
 
-  ThemeMode _themeMode =
-      ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.system;
 
   // ===========================================================================
   // STARTUP
@@ -31,6 +29,8 @@ class _FleckAppState extends State<FleckApp> {
   bool _checkingOnboarding = true;
 
   bool _onboardingCompleted = false;
+
+  bool _splashFinished = false;
 
   // ===========================================================================
   // INIT
@@ -50,8 +50,7 @@ class _FleckAppState extends State<FleckApp> {
   Future<void> _loadStartupState() async {
     try {
       final prefs =
-      await SharedPreferences
-          .getInstance();
+      await SharedPreferences.getInstance();
 
       final completed =
           prefs.getBool(
@@ -64,9 +63,7 @@ class _FleckAppState extends State<FleckApp> {
       }
 
       setState(() {
-        _onboardingCompleted =
-            completed;
-
+        _onboardingCompleted = completed;
         _checkingOnboarding = false;
       });
     } catch (error) {
@@ -79,12 +76,24 @@ class _FleckAppState extends State<FleckApp> {
       }
 
       setState(() {
-        _onboardingCompleted =
-        false;
-
+        _onboardingCompleted = false;
         _checkingOnboarding = false;
       });
     }
+  }
+
+  // ===========================================================================
+  // SPLASH FINISHED
+  // ===========================================================================
+
+  void _onSplashFinished() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _splashFinished = true;
+    });
   }
 
   // ===========================================================================
@@ -109,33 +118,39 @@ class _FleckAppState extends State<FleckApp> {
 
   Widget _buildStartupScreen() {
     // -------------------------------------------------------------------------
-    // Splash while checking first-launch state.
+    // IMPORTANT
+    //
+    // Splash remains visible until:
+    //
+    // 1. SharedPreferences has loaded
+    // 2. Splash animation/timer has finished
+    //
+    // This prevents the splash from disappearing immediately.
     // -------------------------------------------------------------------------
 
-    if (_checkingOnboarding) {
-      return const FoliageSplashScreen();
-    }
-
-    // -------------------------------------------------------------------------
-    // First installation.
-    // -------------------------------------------------------------------------
-
-    if (!_onboardingCompleted) {
-      return FoliageOnboardingScreen(
-        onCompleted:
-        _finishOnboarding,
+    if (_checkingOnboarding || !_splashFinished) {
+      return FoliageSplashScreen(
+        onFinished: _onSplashFinished,
       );
     }
 
     // -------------------------------------------------------------------------
-    // Normal application.
+    // FIRST INSTALLATION
+    // -------------------------------------------------------------------------
+
+    if (!_onboardingCompleted) {
+      return FoliageOnboardingScreen(
+        onCompleted: _finishOnboarding,
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // NORMAL APPLICATION
     // -------------------------------------------------------------------------
 
     return FleckShell(
-      themeMode:
-      _themeMode,
-      onThemeModeChanged:
-      _changeThemeMode,
+      themeMode: _themeMode,
+      onThemeModeChanged: _changeThemeMode,
     );
   }
 
@@ -164,30 +179,45 @@ class _FleckAppState extends State<FleckApp> {
       BuildContext context,
       ) {
     return MaterialApp(
-      debugShowCheckedModeBanner:
-      false,
+      debugShowCheckedModeBanner: false,
 
       title: 'Foliage',
 
       // -----------------------------------------------------------------------
-      // YOUR APP THEME
+      // LIGHT THEME
       // -----------------------------------------------------------------------
 
-      theme:
-      FleckTheme.light,
-
-      darkTheme:
-      FleckTheme.dark,
-
-      themeMode:
-      _themeMode,
+      theme: FleckTheme.light,
 
       // -----------------------------------------------------------------------
-      // APP
+      // DARK THEME
       // -----------------------------------------------------------------------
 
-      home:
-      _buildStartupScreen(),
+      darkTheme: FleckTheme.dark,
+
+      // -----------------------------------------------------------------------
+      // AUTOMATIC SYSTEM THEME
+      // -----------------------------------------------------------------------
+
+      themeMode: _themeMode,
+
+      // -----------------------------------------------------------------------
+      // THEME ANIMATION
+      // -----------------------------------------------------------------------
+
+      themeAnimationDuration:
+      const Duration(
+        milliseconds: 300,
+      ),
+
+      themeAnimationCurve:
+      Curves.easeOutCubic,
+
+      // -----------------------------------------------------------------------
+      // STARTUP
+      // -----------------------------------------------------------------------
+
+      home: _buildStartupScreen(),
     );
   }
 }

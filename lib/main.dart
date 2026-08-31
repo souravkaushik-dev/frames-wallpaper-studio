@@ -26,24 +26,21 @@ class FleckApp extends StatefulWidget {
   });
 
   @override
-  State<FleckApp> createState() =>
-      _FleckAppState();
+  State<FleckApp> createState() => _FleckAppState();
 }
 
-class _FleckAppState
-    extends State<FleckApp> {
+class _FleckAppState extends State<FleckApp> {
   // ===========================================================================
-  // THEME MODE
-  // ===========================================================================
-
-  ThemeMode _themeMode =
-      ThemeMode.system;
-
-  // ===========================================================================
-  // ONBOARDING
+  // THEME
   // ===========================================================================
 
-  bool _checkingOnboarding = true;
+  ThemeMode _themeMode = ThemeMode.system;
+
+  // ===========================================================================
+  // STARTUP
+  // ===========================================================================
+
+  bool _startupComplete = false;
 
   bool _onboardingCompleted = false;
 
@@ -59,14 +56,12 @@ class _FleckAppState
   }
 
   // ===========================================================================
-  // STARTUP STATE
+  // LOAD STARTUP STATE
   // ===========================================================================
 
   Future<void> _loadStartupState() async {
     try {
-      final prefs =
-      await SharedPreferences
-          .getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
       final completed =
           prefs.getBool(
@@ -79,10 +74,8 @@ class _FleckAppState
       }
 
       setState(() {
-        _onboardingCompleted =
-            completed;
-
-        _checkingOnboarding = false;
+        _onboardingCompleted = completed;
+        _startupComplete = true;
       });
     } catch (error) {
       debugPrint(
@@ -94,16 +87,14 @@ class _FleckAppState
       }
 
       setState(() {
-        _onboardingCompleted =
-        false;
-
-        _checkingOnboarding = false;
+        _onboardingCompleted = false;
+        _startupComplete = true;
       });
     }
   }
 
   // ===========================================================================
-  // THEME MODE
+  // THEME
   // ===========================================================================
 
   void _changeThemeMode(
@@ -129,16 +120,34 @@ class _FleckAppState
       return;
     }
 
-    // The onboarding screen already saves:
-    //
-    // foliage_user_name
-    // foliage_onboarding_completed
-    //
-    // We only switch the app to the main shell.
-
     setState(() {
       _onboardingCompleted = true;
     });
+  }
+
+  // ===========================================================================
+  // SPLASH FINISHED
+  // ===========================================================================
+
+  void _onSplashFinished() {
+    if (!mounted) {
+      return;
+    }
+
+    // -------------------------------------------------------------------------
+    // IMPORTANT:
+    //
+    // If SharedPreferences has not finished yet, keep the splash visible.
+    //
+    // Once startup is ready, the widget below automatically becomes either
+    // onboarding or the main shell.
+    // -------------------------------------------------------------------------
+
+    if (!_startupComplete) {
+      return;
+    }
+
+    setState(() {});
   }
 
   // ===========================================================================
@@ -147,33 +156,44 @@ class _FleckAppState
 
   Widget _buildStartupContent() {
     // -------------------------------------------------------------------------
-    // Startup / preference check
+    // SHOW SPLASH FIRST
+    //
+    // This is the key change.
+    //
+    // Previously:
+    //
+    // checking onboarding → splash
+    //
+    // Now:
+    //
+    // app starts → splash
+    //
+    // and preference checking happens at the same time.
     // -------------------------------------------------------------------------
 
-    if (_checkingOnboarding) {
-      return const FoliageSplashScreen();
-    }
-
-    // -------------------------------------------------------------------------
-    // FIRST INSTALL
-    // -------------------------------------------------------------------------
-
-    if (!_onboardingCompleted) {
-      return FoliageOnboardingScreen(
-        onCompleted:
-        _finishOnboarding,
+    if (!_startupComplete) {
+      return FoliageSplashScreen(
+        onFinished: _onSplashFinished,
       );
     }
 
     // -------------------------------------------------------------------------
-    // RETURNING USER
+    // ONBOARDING
+    // -------------------------------------------------------------------------
+
+    if (!_onboardingCompleted) {
+      return FoliageOnboardingScreen(
+        onCompleted: _finishOnboarding,
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // MAIN APP
     // -------------------------------------------------------------------------
 
     return FleckShell(
-      themeMode:
-      _themeMode,
-      onThemeModeChanged:
-      _changeThemeMode,
+      themeMode: _themeMode,
+      onThemeModeChanged: _changeThemeMode,
     );
   }
 
@@ -186,8 +206,7 @@ class _FleckAppState
       BuildContext context,
       ) {
     return ScreenUtilPlusInit(
-      designSize:
-      const Size(
+      designSize: const Size(
         390,
         844,
       ),
@@ -202,26 +221,22 @@ class _FleckAppState
           // APP
           // ===================================================================
 
-          debugShowCheckedModeBanner:
-          false,
+          debugShowCheckedModeBanner: false,
 
           title: 'Foliage',
 
           // ===================================================================
-          // FLECK THEME
+          // THEMES
           // ===================================================================
 
-          theme:
-          FleckTheme.light,
+          theme: FleckTheme.light,
 
-          darkTheme:
-          FleckTheme.dark,
+          darkTheme: FleckTheme.dark,
 
-          themeMode:
-          _themeMode,
+          themeMode: _themeMode,
 
           // ===================================================================
-          // THEME TRANSITION
+          // THEME ANIMATION
           // ===================================================================
 
           themeAnimationDuration:
@@ -236,18 +251,13 @@ class _FleckAppState
           // LOCALIZATION
           // ===================================================================
 
-          localizationsDelegates:
-          const [
-            GlobalMaterialLocalizations
-                .delegate,
-            GlobalWidgetsLocalizations
-                .delegate,
-            GlobalCupertinoLocalizations
-                .delegate,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
           ],
 
-          supportedLocales:
-          const [
+          supportedLocales: const [
             Locale('en'),
           ],
 
@@ -259,23 +269,18 @@ class _FleckAppState
               context,
               child,
               ) {
-            final theme =
-            Theme.of(context);
+            final theme = Theme.of(context);
 
-            final brightness =
-                theme.brightness;
+            final brightness = theme.brightness;
 
-            final colors =
-                theme.colorScheme;
+            final colors = theme.colorScheme;
 
             final isDark =
-                brightness ==
-                    Brightness.dark;
+                brightness == Brightness.dark;
 
             return AnnotatedRegion<
                 SystemUiOverlayStyle>(
-              value:
-              SystemUiOverlayStyle(
+              value: SystemUiOverlayStyle(
                 statusBarColor:
                 Colors.transparent,
 
@@ -295,19 +300,16 @@ class _FleckAppState
                 systemNavigationBarDividerColor:
                 Colors.transparent,
               ),
-              child:
-              child ??
-                  const SizedBox
-                      .shrink(),
+              child: child ??
+                  const SizedBox.shrink(),
             );
           },
 
           // ===================================================================
-          // STARTUP / APP SHELL
+          // HOME
           // ===================================================================
 
-          home:
-          _buildStartupContent(),
+          home: _buildStartupContent(),
         );
       },
     );

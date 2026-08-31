@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hicons/flutter_hicons.dart';
 import 'package:flutter_screenutil_plus/flutter_screenutil_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -288,14 +289,11 @@ class _FleckNormalHeader
 
         Text(
           title,
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(
-            fontWeight:
-            FontWeight.w800,
-            letterSpacing:
-            -1.15,
+          style: GoogleFonts.inter(
+            fontSize: 22.sp,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 2.15,
+            color: colors.onSurface,
           ),
         ),
 

@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 class WallpaperApiService {
   static const String apiUrl =
-      'https://api.npoint.io/65c17dd599b274a512e8';
+      'https://api.npoint.io/7e89575ce8a8ac3c27fe';
 
   final http.Client _client;
 
