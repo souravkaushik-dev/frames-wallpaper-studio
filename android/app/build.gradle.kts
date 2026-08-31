@@ -29,7 +29,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.studios.frames"
+    namespace = "com.studios.dotty"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -39,11 +39,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.studios.frames"
+        applicationId = "com.studios.dotty"
         minSdk = 24
         targetSdk = 36
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = 3
+        versionName = "3.0"
     }
 
     signingConfigs {

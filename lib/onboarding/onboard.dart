@@ -1,424 +1,235 @@
-import 'dart:convert';
-
-import 'package:dotty/api_servie/wallpaper_Api.dart';
-import 'package:dotty/constants/app_colors.dart';
-import 'package:dotty/screens/bottom_nav.dart';
-
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({
+class FoliageOnboardingScreen extends StatefulWidget {
+  const FoliageOnboardingScreen({
     super.key,
+    required this.onCompleted,
   });
 
+  final Future<void> Function(String name) onCompleted;
+
   @override
-  State<OnboardingScreen> createState() =>
-      _OnboardingScreenState();
+  State<FoliageOnboardingScreen> createState() =>
+      _FoliageOnboardingScreenState();
 }
 
-class _OnboardingScreenState
-    extends State<OnboardingScreen> {
-  final PageController controller =
-  PageController();
+class _FoliageOnboardingScreenState
+    extends State<FoliageOnboardingScreen>
+    with TickerProviderStateMixin {
+  // ===========================================================================
+  // PAGE CONTROLLER
+  // ===========================================================================
 
-  int currentPage = 0;
+  late final PageController _pageController;
 
-  bool loading = true;
+  int _currentPage = 0;
 
-  List<Wallpaper> recentWallpapers = [];
+  bool _finishing = false;
 
-  List<Map<String, dynamic>> pages = [];
+  // ===========================================================================
+  // AMBIENT ANIMATION
+  // ===========================================================================
+
+  late final AnimationController _ambientController;
+
+  // ===========================================================================
+  // ONBOARDING CONTENT
+  // ===========================================================================
+
+  final List<_FoliagePage> _pages = const [
+    _FoliagePage(
+      number: '01',
+      eyebrow: 'DISCOVER',
+      title: 'Nature,\nreframed.',
+      description:
+      'Curated wallpapers inspired by the quiet beauty of nature.',
+      imageUrl:
+      'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1600&q=90',
+    ),
+    _FoliagePage(
+      number: '02',
+      eyebrow: 'EXPLORE',
+      title: 'Find your\natmosphere.',
+      description:
+      'Explore cinematic landscapes, organic textures and expressive artwork.',
+      imageUrl:
+      'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1600&q=90',
+    ),
+    _FoliagePage(
+      number: '03',
+      eyebrow: 'PERSONALIZE',
+      title: 'Make it\nyours.',
+      description:
+      'Save the wallpapers that feel right and make your screen feel like home.',
+      imageUrl:
+      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1600&q=90',
+    ),
+  ];
+
+  // ===========================================================================
+  // THEME
+  // ===========================================================================
+
+  bool get _isDark =>
+      Theme.of(context).brightness ==
+          Brightness.dark;
+
+  Color get _background => _isDark
+      ? const Color(0xFF07100C)
+      : const Color(0xFFF4F6F1);
+
+  Color get _foreground => _isDark
+      ? const Color(0xFFF4F7F2)
+      : const Color(0xFF101712);
+
+  Color get _secondary => _isDark
+      ? Colors.white.withValues(alpha: .68)
+      : const Color(0xFF536057);
+
+  Color get _muted => _isDark
+      ? Colors.white.withValues(alpha: .42)
+      : const Color(0xFF687269);
+
+  Color get _accent => _isDark
+      ? const Color(0xFFA5C99F)
+      : const Color(0xFF5E8962);
+
+  Color get _surface => _isDark
+      ? Colors.white.withValues(alpha: .10)
+      : Colors.white.withValues(alpha: .86);
+
+  // ===========================================================================
+  // INIT
+  // ===========================================================================
 
   @override
   void initState() {
     super.initState();
 
-    fetchWallpapers();
+    _pageController = PageController();
+
+    _ambientController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        seconds: 16,
+      ),
+    )..repeat();
   }
+
+  // ===========================================================================
+  // DISPOSE
+  // ===========================================================================
 
   @override
   void dispose() {
-    controller.dispose();
+    _pageController.dispose();
+    _ambientController.dispose();
+
     super.dispose();
   }
 
-  // ============================================================
-  // COLORS
-  // ============================================================
+  // ===========================================================================
+  // NEXT PAGE
+  // ===========================================================================
 
-  bool get isDark =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
-
-  Color get background =>
-      isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground;
-
-  Color get surface =>
-      isDark
-          ? AppColors.darkSurface
-          : AppColors.lightSurface;
-
-  Color get surfaceSoft =>
-      isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
-
-  Color get primary =>
-      isDark
-          ? AppColors.darkPrimary
-          : AppColors.lightPrimary;
-
-  Color get secondary =>
-      isDark
-          ? AppColors.darkSecondary
-          : AppColors.lightSecondary;
-
-  Color get muted =>
-      isDark
-          ? AppColors.darkMuted
-          : AppColors.lightMuted;
-
-  Color get divider =>
-      isDark
-          ? AppColors.darkDivider
-          : AppColors.lightDivider;
-
-  Color get accent =>
-      AppColors.accent;
-
-  // ============================================================
-  // FETCH WALLPAPERS
-  // ============================================================
-
-  Future<void> fetchWallpapers() async {
-    try {
-      final apiUrl =
-      dotenv.env['API_URL'];
-
-      if (apiUrl == null ||
-          apiUrl.isEmpty) {
-        throw Exception(
-          'API_URL is missing',
-        );
-      }
-
-      final response =
-      await http.get(
-        Uri.parse(apiUrl),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Failed to load wallpapers',
-        );
-      }
-
-      final data =
-      jsonDecode(
-        response.body,
-      );
-
-      final List<String> images = [];
-
-      final List<Wallpaper>
-      loadedWallpapers = [];
-
-      final categories =
-      data['categories'];
-
-      if (categories is Map) {
-        categories.forEach(
-              (key, value) {
-            final wallpapers =
-            List<String>.from(
-              value['wallpapers'] ?? [],
-            );
-
-            if (wallpapers.isNotEmpty) {
-              images.add(
-                wallpapers.first,
-              );
-            }
-
-            for (
-            final image
-            in wallpapers
-            ) {
-              loadedWallpapers.add(
-                Wallpaper(
-                  id:
-                  image.hashCode
-                      .toString(),
-                  image:
-                  image,
-                  title:
-                  getWallpaperName(
-                    image,
-                  ),
-                  subtitle:
-                  'Premium wallpaper',
-                  category:
-                  key.toString(),
-                  isViewed:
-                  false,
-                  addedAt:
-                  DateTime.now(),
-                ),
-              );
-            }
-          },
-        );
-      }
-
-      images.shuffle();
-
-      if (images.length < 3) {
-        throw Exception(
-          'Not enough wallpapers',
-        );
-      }
-
-      pages = [
-        {
-          'title':
-          'Visuals,\nrefined.',
-          'subtitle':
-          'A carefully curated space for wallpapers that feel as good as they look.',
-          'image':
-          images[0],
-        },
-        {
-          'title':
-          'Find your\nframe.',
-          'subtitle':
-          'Explore cinematic, minimal and expressive collections made for your screen.',
-          'image':
-          images[1],
-        },
-        {
-          'title':
-          'Made to\nfeel.',
-          'subtitle':
-          'Smooth interactions, thoughtful details and wallpapers designed around your device.',
-          'image':
-          images[2],
-        },
-      ];
-
-      recentWallpapers =
-          loadedWallpapers;
-    } catch (e) {
-      debugPrint(
-        'Onboarding error: $e',
-      );
+  Future<void> _nextPage() async {
+    if (_finishing) {
+      return;
     }
 
-    if (!mounted) {
+    if (_currentPage ==
+        _pages.length - 1) {
+      await _finishOnboarding();
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+
+    await _pageController.nextPage(
+      duration: const Duration(
+        milliseconds: 700,
+      ),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  // ===========================================================================
+  // SKIP
+  // ===========================================================================
+
+  Future<void> _skip() async {
+    if (_finishing) {
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+
+    await _finishOnboarding();
+  }
+
+  // ===========================================================================
+  // FINISH
+  // ===========================================================================
+
+  Future<void> _finishOnboarding() async {
+    if (_finishing) {
       return;
     }
 
     setState(() {
-      loading = false;
+      _finishing = true;
     });
-  }
 
-  // ============================================================
-  // WALLPAPER NAME
-  // ============================================================
-
-  String getWallpaperName(
-      String imageUrl,
-      ) {
-    final fileName =
-        imageUrl
-            .split('/')
-            .last;
-
-    return fileName
-        .split('.')
-        .first
-        .replaceAll(
-      RegExp(
-        r'\d+x\d+',
-      ),
-      '',
-    )
-        .replaceAll(
-      RegExp(
-        r'\d+',
-      ),
-      '',
-    )
-        .replaceAll(
-      '-',
-      ' ',
-    )
-        .replaceAll(
-      '_',
-      ' ',
-    )
-        .trim()
-        .toUpperCase();
-  }
-
-  // ============================================================
-  // FINISH
-  // ============================================================
-
-  Future<void> _finish() async {
     final prefs =
-    await SharedPreferences
-        .getInstance();
+    await SharedPreferences.getInstance();
 
     await prefs.setBool(
-      'onboarding_done',
+      'foliage_onboarding_completed',
       true,
+    );
+
+    await prefs.setString(
+      'foliage_user_name',
+      '',
     );
 
     if (!mounted) {
       return;
     }
 
-    Navigator.of(context)
-        .pushReplacement(
-      PageRouteBuilder(
-        transitionDuration:
-        const Duration(
-          milliseconds: 850,
-        ),
-        pageBuilder:
-            (
-            context,
-            animation,
-            secondaryAnimation,
-            ) =>
-            MainScreen(
-              recentWallpapers:
-              recentWallpapers,
-            ),
-        transitionsBuilder:
-            (
-            context,
-            animation,
-            secondaryAnimation,
-            child,
-            ) {
-          return FadeTransition(
-            opacity:
-            CurvedAnimation(
-              parent:
-              animation,
-              curve:
-              Curves.easeOutCubic,
-            ),
-            child:
-            child,
-          );
-        },
-      ),
-    );
+    await widget.onCompleted('');
   }
 
-  // ============================================================
-  // NEXT
-  // ============================================================
-
-  void _next() {
-    if (currentPage ==
-        pages.length - 1) {
-      _finish();
-      return;
-    }
-
-    controller.nextPage(
-      duration:
-      const Duration(
-        milliseconds: 650,
-      ),
-      curve:
-      Curves.easeOutCubic,
-    );
-  }
-
-  // ============================================================
-  // SKIP
-  // ============================================================
-
-  Future<void> _skip() async {
-    await _finish();
-  }
-
-  // ============================================================
+  // ===========================================================================
   // BUILD
-  // ============================================================
+  // ===========================================================================
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
-    if (loading ||
-        pages.length < 3) {
-      return Scaffold(
-        backgroundColor:
-        background,
-        body:
-        Center(
-          child:
-          SizedBox(
-            width:
-            22.w,
-            height:
-            22.w,
-            child:
-            CircularProgressIndicator(
-              strokeWidth:
-              2,
-              color:
-              accent,
-            ),
-          ),
-        ),
-      );
-    }
-
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-      background,
-
-      body:
-      PageView.builder(
-        controller:
-        controller,
-
-        itemCount:
-        pages.length,
-
+      backgroundColor: _background,
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: _pages.length,
         physics:
         const BouncingScrollPhysics(),
-
-        onPageChanged:
-            (value) {
+        onPageChanged: (index) {
           setState(() {
-            currentPage =
-                value;
+            _currentPage = index;
           });
         },
-
-        itemBuilder:
-            (
+        itemBuilder: (
             context,
             index,
             ) {
           return _buildPage(
-            pages[index],
+            _pages[index],
             index,
           );
         },
@@ -426,343 +237,80 @@ class _OnboardingScreenState
     );
   }
 
-  // ============================================================
+  // ===========================================================================
   // PAGE
-  // ============================================================
+  // ===========================================================================
 
   Widget _buildPage(
-      Map<String, dynamic> item,
+      _FoliagePage page,
       int index,
       ) {
     return Stack(
-      fit:
-      StackFit.expand,
-
+      fit: StackFit.expand,
       children: [
-        // ======================================================
+        // =====================================================================
         // WALLPAPER
-        // ======================================================
+        // =====================================================================
 
-        Hero(
-          tag:
-          item['image'],
-
-          child:
-          Image.network(
-            item['image'],
-            fit:
-            BoxFit.cover,
-
-            errorBuilder:
-                (
-                context,
-                error,
-                stackTrace,
-                ) {
-              return Container(
-                color:
-                background,
-              );
-            },
-          )
-              .animate(
-            onPlay:
-                (controller) {
-              controller.repeat(
-                reverse:
-                true,
-              );
-            },
-          )
-              .scale(
-            begin:
-            const Offset(
-              1,
-              1,
-            ),
-            end:
-            const Offset(
-              1.035,
-              1.035,
-            ),
-            duration:
-            12.seconds,
-            curve:
-            Curves.easeInOut,
-          ),
+        _Wallpaper(
+          imageUrl: page.imageUrl,
+          animation:
+          _ambientController,
         ),
 
-        // ======================================================
+        // =====================================================================
         // CINEMATIC OVERLAY
-        // ======================================================
+        // =====================================================================
 
-        Container(
-          decoration:
-          BoxDecoration(
-            gradient:
-            LinearGradient(
-              begin:
-              Alignment.topCenter,
-              end:
-              Alignment.bottomCenter,
-              colors:
-              isDark
-                  ? [
-                Colors.black
-                    .withOpacity(
-                  .06,
-                ),
-                Colors.black
-                    .withOpacity(
-                  .18,
-                ),
-                background
-                    .withOpacity(
-                  .98,
-                ),
-              ]
-                  : [
-                Colors.black
-                    .withOpacity(
-                  .02,
-                ),
-                Colors.black
-                    .withOpacity(
-                  .07,
-                ),
-                background
-                    .withOpacity(
-                  .97,
-                ),
-              ],
-              stops:
-              const [
-                0,
-                .45,
-                1,
-              ],
-            ),
-          ),
+        _GradientOverlay(
+          isDark: _isDark,
+          background: _background,
         ),
 
-        // ======================================================
+        // =====================================================================
         // CONTENT
-        // ======================================================
+        // =====================================================================
 
         SafeArea(
-          child:
-          Padding(
-            padding:
-            EdgeInsets.fromLTRB(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
               22.w,
-              20.h,
+              18.h,
               22.w,
-              20.h,
+              18.h,
             ),
-
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
               CrossAxisAlignment.start,
-
               children: [
-                // =================================================
-                // TOP LEFT FRAME BRAND
-                // =================================================
+                // =============================================================
+                // HEADER
+                // =============================================================
 
-                Row(
-                  children: [
-                    _FrameMark(
-                      primary:
-                      primary,
-                      accent:
-                      accent,
-                      surface:
-                      surface,
-                    ),
+                _buildHeader(),
 
-                    SizedBox(
-                      width:
-                      10.w,
-                    ),
-
-                    Text(
-                      'FRAMES',
-                      style:
-                      GoogleFonts.inter(
-                        color:
-                        primary,
-                        fontSize:
-                        10.sp,
-                        fontWeight:
-                        FontWeight.w800,
-                        letterSpacing:
-                        2.8,
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // Small skip control
-                    _SkipButton(
-                      secondary:
-                      secondary,
-                      onTap:
-                      _skip,
-                    ),
-                  ],
-                )
-                    .animate()
-                    .fadeIn(
-                  duration:
-                  550.ms,
-                )
-                    .moveY(
-                  begin:
-                  -8,
-                  end:
-                  0,
-                  duration:
-                  600.ms,
-                  curve:
-                  Curves.easeOutCubic,
-                ),
+                // =============================================================
+                // MAIN CONTENT
+                //
+                // Spacer keeps this content toward the bottom while still
+                // allowing it to breathe on different screen sizes.
+                // =============================================================
 
                 const Spacer(),
 
-                // =================================================
-                // PAGE NUMBER
-                // =================================================
-
-                Text(
-                  '0${index + 1}',
-                  style:
-                  GoogleFonts.inter(
-                    color:
-                    accent,
-                    fontSize:
-                    9.sp,
-                    fontWeight:
-                    FontWeight.w800,
-                    letterSpacing:
-                    2,
-                  ),
-                )
-                    .animate()
-                    .fadeIn(
-                  duration:
-                  400.ms,
+                _buildEditorialContent(
+                  page,
+                  index,
                 ),
 
-                SizedBox(
-                  height:
-                  11.h,
-                ),
+                SizedBox(height: 27.h),
 
-                // =================================================
-                // TITLE
-                // =================================================
+                // =============================================================
+                // BOTTOM NAVIGATION
+                // =============================================================
 
-                Text(
-                  item['title'],
-                  style:
-                  GoogleFonts.inter(
-                    color:
-                    primary,
-                    fontSize:
-                    45.sp,
-                    height:
-                    .94,
-                    fontWeight:
-                    FontWeight.w800,
-                    letterSpacing:
-                    -.8,
-                  ),
-                )
-                    .animate()
-                    .fadeIn(
-                  duration:
-                  650.ms,
-                )
-                    .moveY(
-                  begin:
-                  22,
-                  end:
-                  0,
-                  duration:
-                  650.ms,
-                  curve:
-                  Curves.easeOutCubic,
-                ),
-
-                SizedBox(
-                  height:
-                  17.h,
-                ),
-
-                SizedBox(
-                  width:
-                  .82.sw,
-                  child:
-                  Text(
-                    item['subtitle'],
-                    style:
-                    GoogleFonts.inter(
-                      color:
-                      secondary,
-                      fontSize:
-                      13.sp,
-                      height:
-                      1.75,
-                      fontWeight:
-                      FontWeight.w500,
-                    ),
-                  ),
-                )
-                    .animate()
-                    .fadeIn(
-                  delay:
-                  120.ms,
-                  duration:
-                  600.ms,
-                )
-                    .moveY(
-                  begin:
-                  10,
-                  end:
-                  0,
-                  duration:
-                  600.ms,
-                ),
-
-                SizedBox(
-                  height:
-                  30.h,
-                ),
-
-                // =================================================
-                // BOTTOM CONTROLS
-                // =================================================
-
-                _BottomControls(
-                  currentPage:
-                  currentPage,
-                  pageCount:
-                  pages.length,
-                  accent:
-                  accent,
-                  muted:
-                  muted,
-                  primary:
-                  primary,
-                  surface:
-                  surface,
-                  divider:
-                  divider,
-                  isDark:
-                  isDark,
-                  onNext:
-                  _next,
+                _buildBottomControls(
+                  index,
                 ),
               ],
             ),
@@ -771,21 +319,589 @@ class _OnboardingScreenState
       ],
     );
   }
+
+  // ===========================================================================
+  // HEADER
+  // ===========================================================================
+
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        // ---------------------------------------------------------------------
+        // FOLIAGE MARK
+        // ---------------------------------------------------------------------
+
+        _FoliageMark(
+          accent: _accent,
+          surface: _surface,
+        ),
+
+        SizedBox(width: 10.w),
+
+        // ---------------------------------------------------------------------
+        // BRAND
+        // ---------------------------------------------------------------------
+
+        Text(
+          'FOLIAGE',
+          style: GoogleFonts.inter(
+            color: _foreground,
+            fontSize: 10.sp,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 3,
+          ),
+        ),
+
+        const Spacer(),
+
+        // ---------------------------------------------------------------------
+        // SKIP
+        // ---------------------------------------------------------------------
+
+        GestureDetector(
+          onTap: _skip,
+          behavior:
+          HitTestBehavior.opaque,
+          child: Padding(
+            padding:
+            EdgeInsets.symmetric(
+              horizontal: 7.w,
+              vertical: 8.h,
+            ),
+            child: Row(
+              mainAxisSize:
+              MainAxisSize.min,
+              children: [
+                Text(
+                  'SKIP',
+                  style:
+                  GoogleFonts.inter(
+                    color: _foreground
+                        .withValues(
+                      alpha: .78,
+                    ),
+                    fontSize: 9.sp,
+                    fontWeight:
+                    FontWeight.w700,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                SizedBox(width: 4.w),
+                Icon(
+                  Icons
+                      .arrow_forward_rounded,
+                  size: 13.sp,
+                  color:
+                  _foreground
+                      .withValues(
+                    alpha: .78,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    )
+        .animate()
+        .fadeIn(
+      duration: 600.ms,
+    )
+        .moveY(
+      begin: -10,
+      end: 0,
+      duration: 650.ms,
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
+
+  // ===========================================================================
+  // EDITORIAL CONTENT
+  // ===========================================================================
+
+  Widget _buildEditorialContent(
+      _FoliagePage page,
+      int index,
+      ) {
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        // ---------------------------------------------------------------------
+        // NUMBER + EYEBROW
+        // ---------------------------------------------------------------------
+
+        Row(
+          children: [
+            Text(
+              page.number,
+              style: GoogleFonts.inter(
+                color: _accent,
+                fontSize: 9.sp,
+                fontWeight:
+                FontWeight.w800,
+                letterSpacing: 2.4,
+              ),
+            ),
+            SizedBox(width: 13.w),
+            Container(
+              width: 24.w,
+              height: 1.h,
+              color: _accent.withValues(
+                alpha: .55,
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Text(
+              page.eyebrow,
+              style: GoogleFonts.inter(
+                color: _foreground
+                    .withValues(
+                  alpha: .58,
+                ),
+                fontSize: 8.sp,
+                fontWeight:
+                FontWeight.w700,
+                letterSpacing: 1.8,
+              ),
+            ),
+          ],
+        )
+            .animate(
+          key: ValueKey(
+            'meta_$index',
+          ),
+        )
+            .fadeIn(
+          duration: 450.ms,
+        )
+            .moveX(
+          begin: -12,
+          end: 0,
+          duration: 500.ms,
+          curve:
+          Curves.easeOutCubic,
+        ),
+
+        SizedBox(height: 12.h),
+
+        // ---------------------------------------------------------------------
+        // TITLE
+        // ---------------------------------------------------------------------
+
+        Text(
+          page.title,
+          style: GoogleFonts.inter(
+            color: _foreground,
+            fontSize: 45.sp,
+            height: .94,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.8,
+          ),
+        )
+            .animate(
+          key: ValueKey(
+            'title_$index',
+          ),
+        )
+            .fadeIn(
+          delay: 80.ms,
+          duration: 650.ms,
+        )
+            .moveY(
+          begin: 24,
+          end: 0,
+          duration: 700.ms,
+          curve:
+          Curves.easeOutCubic,
+        ),
+
+        SizedBox(height: 17.h),
+
+        // ---------------------------------------------------------------------
+        // DESCRIPTION
+        // ---------------------------------------------------------------------
+
+        SizedBox(
+          width: .82.sw,
+          child: Text(
+            page.description,
+            style: GoogleFonts.inter(
+              color: _secondary,
+              fontSize: 13.sp,
+              height: 1.65,
+              fontWeight:
+              FontWeight.w500,
+            ),
+          ),
+        )
+            .animate(
+          key: ValueKey(
+            'description_$index',
+          ),
+        )
+            .fadeIn(
+          delay: 180.ms,
+          duration: 600.ms,
+        )
+            .moveY(
+          begin: 12,
+          end: 0,
+          duration: 600.ms,
+          curve:
+          Curves.easeOutCubic,
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // BOTTOM CONTROLS
+  // ===========================================================================
+
+  Widget _buildBottomControls(
+      int index,
+      ) {
+    final isLast =
+        index == _pages.length - 1;
+
+    return Row(
+      crossAxisAlignment:
+      CrossAxisAlignment.center,
+      children: [
+        // =====================================================================
+        // PROGRESS
+        // =====================================================================
+
+        Expanded(
+          child: Row(
+            children: List.generate(
+              _pages.length,
+                  (i) {
+                final active =
+                    i == index;
+
+                return AnimatedContainer(
+                  duration:
+                  const Duration(
+                    milliseconds: 450,
+                  ),
+                  curve:
+                  Curves.easeOutCubic,
+                  width:
+                  active ? 31.w : 7.w,
+                  height: 3.h,
+                  margin:
+                  EdgeInsets.only(
+                    right: 7.w,
+                  ),
+                  decoration:
+                  BoxDecoration(
+                    color: active
+                        ? _accent
+                        : _foreground
+                        .withValues(
+                      alpha: .26,
+                    ),
+                    borderRadius:
+                    BorderRadius
+                        .circular(
+                      10.r,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+
+        // =====================================================================
+        // NEXT / ENTER
+        // =====================================================================
+
+        GestureDetector(
+          onTap: _nextPage,
+          behavior:
+          HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration:
+            const Duration(
+              milliseconds: 350,
+            ),
+            curve:
+            Curves.easeOutCubic,
+            height: 48.h,
+            padding:
+            EdgeInsets.symmetric(
+              horizontal:
+              isLast ? 15.w : 0,
+            ),
+            constraints:
+            BoxConstraints(
+              minWidth: 52.w,
+            ),
+            decoration:
+            BoxDecoration(
+              color: _accent,
+              borderRadius:
+              BorderRadius.circular(
+                17.r,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                  _accent.withValues(
+                    alpha:
+                    _isDark ? .12 : .18,
+                  ),
+                  blurRadius: 20,
+                  offset:
+                  const Offset(
+                    0,
+                    7,
+                  ),
+                ),
+              ],
+            ),
+            child: Center(
+              child: isLast
+                  ? Row(
+                mainAxisSize:
+                MainAxisSize.min,
+                children: [
+                  Text(
+                    'ENTER',
+                    style:
+                    GoogleFonts
+                        .inter(
+                      color:
+                      _isDark
+                          ? const Color(
+                        0xFF07100C,
+                      )
+                          : Colors
+                          .white,
+                      fontSize: 9.sp,
+                      fontWeight:
+                      FontWeight.w800,
+                      letterSpacing:
+                      1.2,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 5.w,
+                  ),
+                  Icon(
+                    Icons
+                        .arrow_forward_rounded,
+                    size: 17.sp,
+                    color:
+                    _isDark
+                        ? const Color(
+                      0xFF07100C,
+                    )
+                        : Colors
+                        .white,
+                  ),
+                ],
+              )
+                  : Icon(
+                Icons
+                    .arrow_forward_rounded,
+                size: 19.sp,
+                color:
+                _isDark
+                    ? const Color(
+                  0xFF07100C,
+                )
+                    : Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ],
+    )
+        .animate(
+      key: ValueKey(
+        'controls_$index',
+      ),
+    )
+        .fadeIn(
+      duration: 500.ms,
+    )
+        .scale(
+      begin: const Offset(
+        .95,
+        .95,
+      ),
+      end: const Offset(
+        1,
+        1,
+      ),
+      duration: 500.ms,
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
 }
 
-// ================================================================
-// FRAME MARK
-// ================================================================
+// =============================================================================
+// WALLPAPER
+// =============================================================================
 
-class _FrameMark
+class _Wallpaper extends StatelessWidget {
+  const _Wallpaper({
+    required this.imageUrl,
+    required this.animation,
+  });
+
+  final String imageUrl;
+  final Animation<double> animation;
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (
+          context,
+          child,
+          ) {
+        final value =
+            animation.value *
+                math.pi *
+                2;
+
+        final scale =
+            1.045 +
+                math.sin(value) *
+                    .007;
+
+        final x =
+            math.sin(value) * 4;
+
+        final y =
+            math.cos(value) * 3;
+
+        return Transform.translate(
+          offset: Offset(x, y),
+          child: Transform.scale(
+            scale: scale,
+            child: child,
+          ),
+        );
+      },
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        filterQuality:
+        FilterQuality.high,
+        errorBuilder: (
+            context,
+            error,
+            stackTrace,
+            ) {
+          return Container(
+            color: Theme.of(
+              context,
+            ).scaffoldBackgroundColor,
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// GRADIENT OVERLAY
+// =============================================================================
+
+class _GradientOverlay
     extends StatelessWidget {
-  const _FrameMark({
-    required this.primary,
+  const _GradientOverlay({
+    required this.isDark,
+    required this.background,
+  });
+
+  final bool isDark;
+  final Color background;
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient:
+          LinearGradient(
+            begin:
+            Alignment.topCenter,
+            end:
+            Alignment.bottomCenter,
+            colors: isDark
+                ? [
+              Colors.black
+                  .withValues(
+                alpha: .08,
+              ),
+              Colors.black
+                  .withValues(
+                alpha: .10,
+              ),
+              Colors.black
+                  .withValues(
+                alpha: .30,
+              ),
+              const Color(
+                0xFF07100C,
+              ).withValues(
+                alpha: .98,
+              ),
+            ]
+                : [
+              Colors.black
+                  .withValues(
+                alpha: .025,
+              ),
+              Colors.black
+                  .withValues(
+                alpha: .02,
+              ),
+              Colors.black
+                  .withValues(
+                alpha: .12,
+              ),
+              background.withValues(
+                alpha: .98,
+              ),
+            ],
+            stops: const [
+              0,
+              .35,
+              .60,
+              1,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// FOLIAGE MARK
+// =============================================================================
+
+class _FoliageMark
+    extends StatelessWidget {
+  const _FoliageMark({
     required this.accent,
     required this.surface,
   });
 
-  final Color primary;
   final Color accent;
   final Color surface;
 
@@ -793,84 +909,64 @@ class _FrameMark
   Widget build(
       BuildContext context,
       ) {
-    return Container(
-      width:
-      28.w,
-      height:
-      28.w,
-
-      decoration:
-      BoxDecoration(
-        color:
-        surface.withOpacity(
-          .92,
-        ),
-
-        border:
-        Border.all(
-          color:
-          primary.withOpacity(
-            .16,
-          ),
-        ),
-
-        borderRadius:
-        BorderRadius.circular(
-          8.r,
-        ),
-      ),
-
-      child:
-      Stack(
+    return SizedBox(
+      width: 30.w,
+      height: 30.w,
+      child: Stack(
         children: [
-          Positioned(
-            left:
-            5.w,
-            top:
-            5.w,
-            right:
-            5.w,
-            bottom:
-            5.w,
-            child:
-            Container(
+          // -------------------------------------------------------------------
+          // OUTER
+          // -------------------------------------------------------------------
+
+          Positioned.fill(
+            child: Container(
               decoration:
               BoxDecoration(
-                border:
-                Border.all(
-                  color:
-                  accent.withOpacity(
-                    .65,
-                  ),
-                  width:
-                  1.2,
-                ),
+                color: surface,
                 borderRadius:
-                BorderRadius.circular(
-                  4.r,
+                BorderRadius
+                    .circular(
+                  9.r,
+                ),
+                border: Border.all(
+                  color:
+                  accent.withValues(
+                    alpha: .22,
+                  ),
+                  width: .8,
                 ),
               ),
             ),
           ),
 
+          // -------------------------------------------------------------------
+          // INNER ORGANIC MARK
+          // -------------------------------------------------------------------
+
+          Center(
+            child: Icon(
+              Icons.eco_rounded,
+              size: 17.sp,
+              color: accent,
+            ),
+          ),
+
+          // -------------------------------------------------------------------
+          // DETAIL
+          // -------------------------------------------------------------------
+
           Positioned(
-            right:
-            5.w,
-            bottom:
-            5.w,
-            child:
-            Container(
-              width:
-              4.5.w,
-              height:
-              4.5.w,
+            right: 5.w,
+            bottom: 5.w,
+            child: Container(
+              width: 4.w,
+              height: 4.w,
               decoration:
               BoxDecoration(
-                color:
-                accent,
+                color: accent,
                 borderRadius:
                 BorderRadius.circular(
-                  1.5.r,
+                  2.r,
                 ),
               ),
             ),
@@ -881,384 +977,22 @@ class _FrameMark
   }
 }
 
-// ================================================================
-// SKIP BUTTON
-// ================================================================
+// =============================================================================
+// PAGE MODEL
+// =============================================================================
 
-class _SkipButton
-    extends StatelessWidget {
-  const _SkipButton({
-    required this.secondary,
-    required this.onTap,
+class _FoliagePage {
+  const _FoliagePage({
+    required this.number,
+    required this.eyebrow,
+    required this.title,
+    required this.description,
+    required this.imageUrl,
   });
 
-  final Color secondary;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return Material(
-      color:
-      Colors.transparent,
-
-      child:
-      InkWell(
-        onTap:
-        onTap,
-
-        borderRadius:
-        BorderRadius.circular(
-          14.r,
-        ),
-
-        child:
-        Padding(
-          padding:
-          EdgeInsets.symmetric(
-            horizontal:
-            8.w,
-            vertical:
-            7.h,
-          ),
-
-          child:
-          Row(
-            mainAxisSize:
-            MainAxisSize.min,
-
-            children: [
-              Text(
-                'SKIP',
-                style:
-                GoogleFonts.inter(
-                  color:
-                  secondary,
-                  fontSize:
-                  9.sp,
-                  fontWeight:
-                  FontWeight.w700,
-                  letterSpacing:
-                  1.2,
-                ),
-              ),
-
-              SizedBox(
-                width:
-                4.w,
-              ),
-
-              Icon(
-                Icons
-                    .arrow_forward_rounded,
-                size:
-                13.sp,
-                color:
-                secondary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ================================================================
-// BOTTOM CONTROLS
-// ================================================================
-
-class _BottomControls
-    extends StatelessWidget {
-  const _BottomControls({
-    required this.currentPage,
-    required this.pageCount,
-    required this.accent,
-    required this.muted,
-    required this.primary,
-    required this.surface,
-    required this.divider,
-    required this.isDark,
-    required this.onNext,
-  });
-
-  final int currentPage;
-  final int pageCount;
-
-  final Color accent;
-  final Color muted;
-  final Color primary;
-  final Color surface;
-  final Color divider;
-
-  final bool isDark;
-
-  final VoidCallback onNext;
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    final isLast =
-        currentPage ==
-            pageCount - 1;
-
-    return Row(
-      crossAxisAlignment:
-      CrossAxisAlignment.center,
-
-      children: [
-        // ------------------------------------------------------
-        // INDICATORS
-        // ------------------------------------------------------
-
-        Expanded(
-          child:
-          Row(
-            children:
-            List.generate(
-              pageCount,
-                  (index) {
-                final active =
-                    currentPage ==
-                        index;
-
-                return AnimatedContainer(
-                  duration:
-                  const Duration(
-                    milliseconds:
-                    400,
-                  ),
-
-                  curve:
-                  Curves.easeOutCubic,
-
-                  margin:
-                  EdgeInsets.only(
-                    right:
-                    7.w,
-                  ),
-
-                  width:
-                  active
-                      ? 28.w
-                      : 6.w,
-
-                  height:
-                  3.h,
-
-                  decoration:
-                  BoxDecoration(
-                    color:
-                    active
-                        ? accent
-                        : muted.withOpacity(
-                      .28,
-                    ),
-
-                    borderRadius:
-                    BorderRadius.circular(
-                      20.r,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-
-        SizedBox(
-          width:
-          12.w,
-        ),
-
-        // ------------------------------------------------------
-        // UNIQUE NEXT BUTTON
-        // ------------------------------------------------------
-
-        _NextButton(
-          isLast:
-          isLast,
-          accent:
-          accent,
-          primary:
-          primary,
-          surface:
-          surface,
-          divider:
-          divider,
-          onTap:
-          onNext,
-        ),
-      ],
-    );
-  }
-}
-
-// ================================================================
-// NEXT BUTTON
-// ================================================================
-
-class _NextButton
-    extends StatelessWidget {
-  const _NextButton({
-    required this.isLast,
-    required this.accent,
-    required this.primary,
-    required this.surface,
-    required this.divider,
-    required this.onTap,
-  });
-
-  final bool isLast;
-
-  final Color accent;
-  final Color primary;
-  final Color surface;
-  final Color divider;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return Material(
-      color:
-      Colors.transparent,
-
-      child:
-      InkWell(
-        onTap:
-        onTap,
-
-        borderRadius:
-        BorderRadius.circular(
-          18.r,
-        ),
-
-        child:
-        AnimatedContainer(
-          duration:
-          const Duration(
-            milliseconds:
-            350,
-          ),
-
-          curve:
-          Curves.easeOutCubic,
-
-          height:
-          48.h,
-
-          constraints:
-          BoxConstraints(
-            minWidth:
-            52.w,
-            maxWidth:
-            92.w,
-          ),
-
-          padding:
-          EdgeInsets.symmetric(
-            horizontal:
-            isLast
-                ? 14.w
-                : 0,
-          ),
-
-          decoration:
-          BoxDecoration(
-            color:
-            accent,
-
-            borderRadius:
-            BorderRadius.circular(
-              18.r,
-            ),
-
-            border:
-            Border.all(
-              color:
-              accent.withOpacity(
-                .35,
-              ),
-              width:
-              1,
-            ),
-          ),
-
-          child:
-          Center(
-            child:
-            isLast
-                ? Row(
-              mainAxisSize:
-              MainAxisSize.min,
-              children: [
-                Text(
-                  'ENTER',
-                  style:
-                  GoogleFonts.inter(
-                    color:
-                    primary,
-                    fontSize:
-                    9.sp,
-                    fontWeight:
-                    FontWeight.w800,
-                    letterSpacing:
-                    1.1,
-                  ),
-                ),
-                SizedBox(
-                  width:
-                  5.w,
-                ),
-                Icon(
-                  Icons
-                      .arrow_forward_rounded,
-                  color:
-                  primary,
-                  size:
-                  17.sp,
-                ),
-              ],
-            )
-                : Icon(
-              Icons
-                  .arrow_forward_rounded,
-              color:
-              primary,
-              size:
-              19.sp,
-            ),
-          ),
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      200.ms,
-      duration:
-      500.ms,
-    )
-        .scale(
-      begin:
-      const Offset(
-        .92,
-        .92,
-      ),
-      end:
-      const Offset(
-        1,
-        1,
-      ),
-      duration:
-      550.ms,
-      curve:
-      Curves.easeOutCubic,
-    );
-  }
+  final String number;
+  final String eyebrow;
+  final String title;
+  final String description;
+  final String imageUrl;
 }

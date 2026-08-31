@@ -1,4 +1,4 @@
-package com.studios.frames
+package com.studios.dotty
 
 import io.flutter.embedding.android.FlutterActivity
 

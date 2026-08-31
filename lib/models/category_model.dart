@@ -20,7 +20,6 @@ class CategoriesPage extends StatefulWidget {
 class _CategoriesPageState extends State<CategoriesPage>
     with SingleTickerProviderStateMixin {
   late Future<Map<String, dynamic>> _future;
-
   late final AnimationController _heroController;
 
   @override
@@ -31,7 +30,7 @@ class _CategoriesPageState extends State<CategoriesPage>
 
     _heroController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 7),
+      duration: const Duration(seconds: 12),
     )..repeat(reverse: true);
   }
 
@@ -41,9 +40,9 @@ class _CategoriesPageState extends State<CategoriesPage>
     super.dispose();
   }
 
-  // ============================================================
+  // ------------------------------------------------------------
   // API
-  // ============================================================
+  // ------------------------------------------------------------
 
   Future<Map<String, dynamic>> fetchData() async {
     final apiUrl = dotenv.env['API_URL'];
@@ -52,9 +51,7 @@ class _CategoriesPageState extends State<CategoriesPage>
       throw Exception('API_URL is not configured');
     }
 
-    final response = await http.get(
-      Uri.parse(apiUrl),
-    );
+    final response = await http.get(Uri.parse(apiUrl));
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -71,9 +68,9 @@ class _CategoriesPageState extends State<CategoriesPage>
     return decoded;
   }
 
-  // ============================================================
+  // ------------------------------------------------------------
   // THEME
-  // ============================================================
+  // ------------------------------------------------------------
 
   bool _isDark(BuildContext context) {
     return Theme.of(context).brightness == Brightness.dark;
@@ -97,7 +94,7 @@ class _CategoriesPageState extends State<CategoriesPage>
         : AppColors.lightSurfaceSoft;
   }
 
-  Color _primary(BuildContext context) {
+  Color _text(BuildContext context) {
     return _isDark(context)
         ? AppColors.darkPrimary
         : AppColors.lightPrimary;
@@ -123,16 +120,16 @@ class _CategoriesPageState extends State<CategoriesPage>
 
   Color get _accent => AppColors.accent;
 
-  // ============================================================
+  // ------------------------------------------------------------
   // BUILD
-  // ============================================================
+  // ------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     final background = _background(context);
     final surface = _surface(context);
     final surfaceSoft = _surfaceSoft(context);
-    final text = _primary(context);
+    final text = _text(context);
     final secondary = _secondary(context);
     final muted = _muted(context);
     final divider = _divider(context);
@@ -145,7 +142,6 @@ class _CategoriesPageState extends State<CategoriesPage>
           if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildLoading(
               background: background,
-              primary: text,
               secondary: secondary,
             );
           }
@@ -163,13 +159,11 @@ class _CategoriesPageState extends State<CategoriesPage>
           if (!snapshot.hasData) {
             return _buildLoading(
               background: background,
-              primary: text,
               secondary: secondary,
             );
           }
 
           final data = snapshot.data!;
-
           final rawCategories = data['categories'];
 
           final Map<String, dynamic> categories =
@@ -177,7 +171,7 @@ class _CategoriesPageState extends State<CategoriesPage>
               ? Map<String, dynamic>.from(rawCategories)
               : <String, dynamic>{};
 
-          final categoryEntries = categories.entries.toList();
+          final entries = categories.entries.toList();
 
           return RefreshIndicator(
             color: _accent,
@@ -194,138 +188,73 @@ class _CategoriesPageState extends State<CategoriesPage>
                 parent: AlwaysScrollableScrollPhysics(),
               ),
               slivers: [
-                // ==================================================
-                // CINEMATIC HERO
-                // ==================================================
-
                 SliverToBoxAdapter(
-                  child: _buildHero(
-                    context: context,
-                    text: text,
-                    secondary: secondary,
-                    categoryCount: categoryEntries.length,
+                  child: _buildHeader(
+                    context,
+                    count: entries.length,
                   ),
                 ),
-
-                // ==================================================
-                // SECTION HEADER
-                // ==================================================
 
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
-                      22.w,
-                      8.h,
-                      22.w,
-                      22.h,
+                      20.w,
+                      10.h,
+                      20.w,
+                      18.h,
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'COLLECTIONS',
-                                style: GoogleFonts.bebasNeue(
-                                  color: text,
-                                  fontSize: 43.sp,
-                                  height: .82,
-                                  letterSpacing: 2.8,
-                                ),
-                              ),
-                              SizedBox(height: 9.h),
-                              Row(
-                                children: [
-                                  AnimatedContainer(
-                                    duration: const Duration(
-                                      milliseconds: 500,
-                                    ),
-                                    width: 25.w,
-                                    height: 2,
-                                    color: _accent,
-                                  ),
-                                  SizedBox(width: 9.w),
-                                  Text(
-                                    'CURATED VISUAL WORLDS',
-                                    style: GoogleFonts.inter(
-                                      color: secondary,
-                                      fontSize: 8.sp,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.7,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                        Text(
+                          'Explore',
+                          style: GoogleFonts.manrope(
+                            color: text,
+                            fontSize: 24.sp,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.8,
                           ),
                         ),
+                        const Spacer(),
                         Container(
-                          width: 42.w,
-                          height: 42.w,
-                          decoration: BoxDecoration(
-                            color: _accent.withOpacity(.07),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: divider,
-                            ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 11.w,
+                            vertical: 7.h,
                           ),
-                          child: Center(
-                            child: Text(
-                              categoryEntries.length
-                                  .toString()
-                                  .padLeft(2, '0'),
-                              style: GoogleFonts.inter(
-                                color: text,
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                              ),
+                          decoration: BoxDecoration(
+                            color: surfaceSoft,
+                            borderRadius: BorderRadius.circular(20.r),
+                          ),
+                          child: Text(
+                            '${entries.length} collections',
+                            style: GoogleFonts.manrope(
+                              color: muted,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  )
-                      .animate()
-                      .fadeIn(
-                    duration: const Duration(
-                      milliseconds: 650,
-                    ),
-                  )
-                      .moveY(
-                    begin: 22,
-                    end: 0,
-                    curve: Curves.easeOutExpo,
                   ),
                 ),
 
-                // ==================================================
-                // CATEGORY GRID
-                // ==================================================
-
-                if (categoryEntries.isEmpty)
+                if (entries.isEmpty)
                   SliverFillRemaining(
                     child: _buildEmpty(
-                      context,
-                      text,
-                      secondary,
+                      text: text,
+                      secondary: secondary,
                     ),
                   )
                 else
                   SliverPadding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 18.w,
-                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
                     sliver: SliverMasonryGrid.count(
                       crossAxisCount: 2,
-                      mainAxisSpacing: 14.h,
-                      crossAxisSpacing: 14.w,
-                      childCount: categoryEntries.length,
+                      mainAxisSpacing: 12.h,
+                      crossAxisSpacing: 12.w,
+                      childCount: entries.length,
                       itemBuilder: (context, index) {
-                        final entry = categoryEntries[index];
-                        final categoryName = entry.key;
+                        final entry = entries[index];
 
                         final category =
                         entry.value is Map
@@ -344,22 +273,20 @@ class _CategoriesPageState extends State<CategoriesPage>
                         rawWallpapers is List
                             ? rawWallpapers
                             .map((item) => item.toString())
-                            .where(
-                              (item) => item.isNotEmpty,
-                        )
+                            .where((item) => item.isNotEmpty)
                             .toList()
                             : <String>[];
 
                         const heights = [
-                          360.0,
-                          280.0,
-                          410.0,
-                          315.0,
+                          310.0,
+                          250.0,
+                          350.0,
+                          285.0,
                         ];
 
-                        return _CinematicCategoryCard(
+                        return _MinimalCategoryCard(
                           index: index,
-                          title: categoryName,
+                          title: entry.key,
                           thumbnail: thumbnail,
                           wallpaperCount: wallpapers.length,
                           height: heights[index % heights.length].h,
@@ -369,7 +296,7 @@ class _CategoriesPageState extends State<CategoriesPage>
                           onTap: () {
                             _openCategory(
                               context,
-                              title: categoryName,
+                              title: entry.key,
                               wallpapers: wallpapers,
                             );
                           },
@@ -378,35 +305,8 @@ class _CategoriesPageState extends State<CategoriesPage>
                     ),
                   ),
 
-                // ==================================================
-                // BOTTOM
-                // ==================================================
-
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 80.h,
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 34.w,
-                          height: 1,
-                          color: divider,
-                        ),
-                        SizedBox(height: 12.h),
-                        Text(
-                          'END OF COLLECTIONS',
-                          style: GoogleFonts.inter(
-                            color: muted.withOpacity(.55),
-                            fontSize: 8.sp,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: SizedBox(height: 60.h),
                 ),
               ],
             ),
@@ -416,45 +316,42 @@ class _CategoriesPageState extends State<CategoriesPage>
     );
   }
 
-  // ============================================================
-  // HERO
-  // ============================================================
+  // ------------------------------------------------------------
+  // HEADER
+  // ------------------------------------------------------------
 
-  Widget _buildHero({
-    required BuildContext context,
-    required Color text,
-    required Color secondary,
-    required int categoryCount,
-  }) {
+  Widget _buildHeader(
+      BuildContext context, {
+        required int count,
+      }) {
+    final text = _text(context);
+    final secondary = _secondary(context);
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        22.w,
-        78.h,
-        22.w,
+        20.w,
+        70.h,
+        20.w,
         28.h,
       ),
       child: AnimatedBuilder(
         animation: _heroController,
         builder: (context, child) {
-          final progress = Curves.easeInOut.transform(
+          final value = Curves.easeInOut.transform(
             _heroController.value,
           );
 
-          final offsetX = (progress - .5) * 5;
-          final offsetY = (progress - .5) * 3;
-
           return Transform.translate(
-            offset: Offset(offsetX, offsetY),
+            offset: Offset(
+              (value - .5) * 3,
+              (value - .5) * 2,
+            ),
             child: child,
           );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ======================================================
-            // SMALL LABEL
-            // ======================================================
-
             Row(
               children: [
                 Container(
@@ -465,161 +362,88 @@ class _CategoriesPageState extends State<CategoriesPage>
                     shape: BoxShape.circle,
                   ),
                 ),
-                SizedBox(width: 9.w),
+                SizedBox(width: 8.w),
                 Text(
-                  'FRAME / COLLECTIONS',
-                  style: GoogleFonts.inter(
+                  'WALLPAPER COLLECTIONS',
+                  style: GoogleFonts.manrope(
                     color: secondary,
                     fontSize: 9.sp,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.2,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.4,
                   ),
                 ),
               ],
-            )
-                .animate()
-                .fadeIn(
-              duration: const Duration(
-                milliseconds: 500,
-              ),
-            )
-                .moveX(
-              begin: -20,
-              end: 0,
-              curve: Curves.easeOutExpo,
             ),
 
-            SizedBox(height: 12.h),
-
-            // ======================================================
-            // BIG TITLE
-            // ======================================================
+            SizedBox(height: 16.h),
 
             Text(
-              'DISCOVER',
-              style: GoogleFonts.bebasNeue(
+              'Find your\nnext wallpaper.',
+              style: GoogleFonts.manrope(
                 color: text,
-                fontSize: 92.sp,
-                height: .76,
-                letterSpacing: 2.5,
+                fontSize: 45.sp,
+                fontWeight: FontWeight.w700,
+                height: .98,
+                letterSpacing: -2.2,
               ),
-            )
-                .animate()
-                .fadeIn(
-              duration: const Duration(
-                milliseconds: 900,
-              ),
-            )
-                .moveY(
-              begin: 80,
-              end: 0,
-              duration: const Duration(
-                milliseconds: 950,
-              ),
-              curve: Curves.easeOutExpo,
-            )
-                .scale(
-              begin: const Offset(.92, .92),
-              end: const Offset(1, 1),
-              duration: const Duration(
-                milliseconds: 950,
-              ),
-              curve: Curves.easeOutExpo,
             ),
 
-            SizedBox(height: 18.h),
-
-            // ======================================================
-            // DESCRIPTION
-            // ======================================================
+            SizedBox(height: 15.h),
 
             SizedBox(
-              width: 330.w,
+              width: 310.w,
               child: Text(
-                'Curated visual worlds built around atmosphere, mood and modern screen aesthetics.',
-                style: GoogleFonts.inter(
+                'A carefully selected collection of wallpapers for every mood and screen.',
+                style: GoogleFonts.manrope(
                   color: secondary,
-                  fontSize: 13.sp,
-                  height: 1.65,
+                  fontSize: 12.sp,
                   fontWeight: FontWeight.w500,
+                  height: 1.55,
                 ),
               ),
-            )
-                .animate()
-                .fadeIn(
-              delay: const Duration(
-                milliseconds: 250,
-              ),
-              duration: const Duration(
-                milliseconds: 700,
-              ),
-            )
-                .moveY(
-              begin: 20,
-              end: 0,
-              curve: Curves.easeOutExpo,
             ),
 
             SizedBox(height: 22.h),
 
-            // ======================================================
-            // META
-            // ======================================================
-
             Row(
               children: [
-                _MetaItem(
-                  number: categoryCount
-                      .toString()
-                      .padLeft(2, '0'),
-                  label: 'WORLDS',
+                _HeaderStat(
+                  value: count.toString().padLeft(2, '0'),
+                  label: 'COLLECTIONS',
                   color: text,
                 ),
-                SizedBox(width: 22.w),
-                _MetaDivider(
+                SizedBox(width: 18.w),
+                Container(
+                  width: 1,
+                  height: 25.h,
                   color: _divider(context),
                 ),
-                SizedBox(width: 22.w),
-                _MetaItem(
-                  number: '4K',
-                  label: 'READY',
-                  color: text,
-                ),
-                SizedBox(width: 22.w),
-                _MetaDivider(
-                  color: _divider(context),
-                ),
-                SizedBox(width: 22.w),
-                _MetaItem(
-                  number: '∞',
-                  label: 'MOODS',
+                SizedBox(width: 18.w),
+                _HeaderStat(
+                  value: '4K',
+                  label: 'QUALITY',
                   color: text,
                 ),
               ],
-            )
-                .animate()
-                .fadeIn(
-              delay: const Duration(
-                milliseconds: 450,
-              ),
-              duration: const Duration(
-                milliseconds: 700,
-              ),
-            )
-                .moveY(
-              begin: 20,
-              end: 0,
-              curve: Curves.easeOutExpo,
             ),
           ],
         ),
+      )
+          .animate()
+          .fadeIn(
+        duration: const Duration(milliseconds: 650),
+      )
+          .moveY(
+        begin: 20,
+        end: 0,
+        curve: Curves.easeOutCubic,
       ),
     );
   }
 
-  // ============================================================
-  // OPEN CATEGORY
-  // ============================================================
+  // ------------------------------------------------------------
+  // NAVIGATION
+  // ------------------------------------------------------------
 
   void _openCategory(
       BuildContext context, {
@@ -629,12 +453,9 @@ class _CategoriesPageState extends State<CategoriesPage>
     Navigator.push(
       context,
       PageRouteBuilder(
-        transitionDuration: const Duration(
-          milliseconds: 850,
-        ),
-        reverseTransitionDuration: const Duration(
-          milliseconds: 600,
-        ),
+        transitionDuration: const Duration(milliseconds: 550),
+        reverseTransitionDuration:
+        const Duration(milliseconds: 400),
         pageBuilder: (_, animation, __) {
           return CategoryScreen(
             title: title,
@@ -644,23 +465,17 @@ class _CategoriesPageState extends State<CategoriesPage>
         transitionsBuilder: (_, animation, __, child) {
           final curved = CurvedAnimation(
             parent: animation,
-            curve: Curves.easeOutExpo,
+            curve: Curves.easeOutCubic,
           );
 
           return FadeTransition(
             opacity: curved,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0, .08),
+                begin: const Offset(0, .035),
                 end: Offset.zero,
               ).animate(curved),
-              child: ScaleTransition(
-                scale: Tween<double>(
-                  begin: .96,
-                  end: 1,
-                ).animate(curved),
-                child: child,
-              ),
+              child: child,
             ),
           );
         },
@@ -668,13 +483,12 @@ class _CategoriesPageState extends State<CategoriesPage>
     );
   }
 
-  // ============================================================
+  // ------------------------------------------------------------
   // LOADING
-  // ============================================================
+  // ------------------------------------------------------------
 
   Widget _buildLoading({
     required Color background,
-    required Color primary,
     required Color secondary,
   }) {
     return Container(
@@ -683,58 +497,33 @@ class _CategoriesPageState extends State<CategoriesPage>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 58.w,
-            height: 58.w,
-            decoration: BoxDecoration(
-              color: _accent.withOpacity(.035),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _accent.withOpacity(.16),
-              ),
+          SizedBox(
+            width: 22.w,
+            height: 22.w,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: _accent,
             ),
-            child: Center(
-              child: SizedBox(
-                width: 21.w,
-                height: 21.w,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.6,
-                  color: _accent,
-                ),
-              ),
-            ),
-          )
-              .animate(
-            onPlay: (controller) => controller.repeat(
-              reverse: true,
-            ),
-          )
-              .scale(
-            begin: const Offset(.94, .94),
-            end: const Offset(1.05, 1.05),
-            duration: const Duration(
-              milliseconds: 1500,
-            ),
-            curve: Curves.easeInOut,
           ),
-          SizedBox(height: 18.h),
+          SizedBox(height: 16.h),
           Text(
-            'CURATING',
-            style: GoogleFonts.inter(
+            'Loading collections',
+            style: GoogleFonts.manrope(
               color: secondary,
-              fontSize: 9.sp,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2.5,
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: const Duration(milliseconds: 400));
   }
 
-  // ============================================================
+  // ------------------------------------------------------------
   // ERROR
-  // ============================================================
+  // ------------------------------------------------------------
 
   Widget _buildError({
     required Color background,
@@ -751,41 +540,47 @@ class _CategoriesPageState extends State<CategoriesPage>
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 82.w,
-            height: 82.w,
+            width: 64.w,
+            height: 64.w,
             decoration: BoxDecoration(
               color: surface,
               shape: BoxShape.circle,
-              border: Border.all(
-                color: divider,
-              ),
+              border: Border.all(color: divider),
             ),
             child: Icon(
               Icons.cloud_off_rounded,
-              color: _accent.withOpacity(.70),
-              size: 34.sp,
+              color: _accent,
+              size: 27.sp,
             ),
           ),
-          SizedBox(height: 20.h),
+
+          SizedBox(height: 18.h),
+
           Text(
-            'COLLECTIONS UNAVAILABLE',
+            'Something went wrong',
             textAlign: TextAlign.center,
-            style: GoogleFonts.bebasNeue(
+            style: GoogleFonts.manrope(
               color: text,
-              fontSize: 28.sp,
-              letterSpacing: 1.5,
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
             ),
           ),
-          SizedBox(height: 8.h),
+
+          SizedBox(height: 7.h),
+
           Text(
             'Check your connection and try again.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.manrope(
               color: secondary,
               fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          SizedBox(height: 22.h),
+
+          SizedBox(height: 20.h),
+
           GestureDetector(
             onTap: () {
               setState(() {
@@ -794,130 +589,80 @@ class _CategoriesPageState extends State<CategoriesPage>
             },
             child: Container(
               padding: EdgeInsets.symmetric(
-                horizontal: 20.w,
+                horizontal: 18.w,
                 vertical: 11.h,
               ),
               decoration: BoxDecoration(
-                color: _accent.withOpacity(.08),
-                borderRadius: BorderRadius.circular(18.r),
-                border: Border.all(
-                  color: divider,
-                ),
+                color: _accent,
+                borderRadius: BorderRadius.circular(14.r),
               ),
               child: Text(
-                'TRY AGAIN',
-                style: GoogleFonts.inter(
-                  color: text,
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
+                'Try again',
+                style: GoogleFonts.manrope(
+                  color: Colors.white,
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration: const Duration(
-        milliseconds: 600,
-      ),
-    )
-        .moveY(
-      begin: 25,
-      end: 0,
-      curve: Curves.easeOutExpo,
     );
   }
 
-  // ============================================================
+  // ------------------------------------------------------------
   // EMPTY
-  // ============================================================
+  // ------------------------------------------------------------
 
-  Widget _buildEmpty(
-      BuildContext context,
-      Color text,
-      Color secondary,
-      ) {
+  Widget _buildEmpty({
+    required Color text,
+    required Color secondary,
+  }) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 105.w,
-            height: 105.w,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _accent.withOpacity(.035),
-              border: Border.all(
-                color: _accent.withOpacity(.13),
-              ),
-            ),
-            child: Icon(
-              Icons.collections_rounded,
-              color: _accent.withOpacity(.55),
-              size: 40.sp,
-            ),
-          )
-              .animate(
-            onPlay: (controller) => controller.repeat(
-              reverse: true,
-            ),
-          )
-              .scale(
-            begin: const Offset(.95, .95),
-            end: const Offset(1.04, 1.04),
-            duration: const Duration(
-              milliseconds: 1800,
-            ),
-            curve: Curves.easeInOut,
+          Icon(
+            Icons.photo_library_outlined,
+            color: _accent.withOpacity(.55),
+            size: 42.sp,
           ),
-          SizedBox(height: 25.h),
+          SizedBox(height: 18.h),
           Text(
-            'NO COLLECTIONS',
-            style: GoogleFonts.bebasNeue(
+            'No collections yet',
+            style: GoogleFonts.manrope(
               color: text,
-              fontSize: 32.sp,
-              letterSpacing: 2,
+              fontSize: 21.sp,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 7.h),
           Text(
-            'New visual worlds will appear here soon.',
-            style: GoogleFonts.inter(
+            'New wallpapers will appear here soon.',
+            style: GoogleFonts.manrope(
               color: secondary,
               fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration: const Duration(
-        milliseconds: 700,
-      ),
-    )
-        .moveY(
-      begin: 25,
-      end: 0,
-      curve: Curves.easeOutExpo,
     );
   }
 }
 
-// ==================================================================
-// META ITEM
-// ==================================================================
+// ============================================================
+// HEADER STAT
+// ============================================================
 
-class _MetaItem extends StatelessWidget {
-  final String number;
+class _HeaderStat extends StatelessWidget {
+  final String value;
   final String label;
   final Color color;
 
-  const _MetaItem({
-    required this.number,
+  const _HeaderStat({
+    required this.value,
     required this.label,
     required this.color,
   });
@@ -928,22 +673,22 @@ class _MetaItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          number,
-          style: GoogleFonts.bebasNeue(
+          value,
+          style: GoogleFonts.manrope(
             color: color,
-            fontSize: 25.sp,
-            height: .8,
-            letterSpacing: 1,
+            fontSize: 19.sp,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
           ),
         ),
-        SizedBox(height: 5.h),
+        SizedBox(height: 3.h),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: GoogleFonts.manrope(
             color: color.withOpacity(.45),
             fontSize: 7.sp,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
           ),
         ),
       ],
@@ -951,32 +696,11 @@ class _MetaItem extends StatelessWidget {
   }
 }
 
-// ==================================================================
-// META DIVIDER
-// ==================================================================
+// ============================================================
+// MINIMAL CATEGORY CARD
+// ============================================================
 
-class _MetaDivider extends StatelessWidget {
-  final Color color;
-
-  const _MetaDivider({
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 26.h,
-      color: color,
-    );
-  }
-}
-
-// ==================================================================
-// CINEMATIC CATEGORY CARD
-// ==================================================================
-
-class _CinematicCategoryCard extends StatefulWidget {
+class _MinimalCategoryCard extends StatefulWidget {
   final int index;
   final String title;
   final String thumbnail;
@@ -987,7 +711,7 @@ class _CinematicCategoryCard extends StatefulWidget {
   final Color muted;
   final VoidCallback onTap;
 
-  const _CinematicCategoryCard({
+  const _MinimalCategoryCard({
     required this.index,
     required this.title,
     required this.thumbnail,
@@ -1000,12 +724,12 @@ class _CinematicCategoryCard extends StatefulWidget {
   });
 
   @override
-  State<_CinematicCategoryCard> createState() =>
-      _CinematicCategoryCardState();
+  State<_MinimalCategoryCard> createState() =>
+      _MinimalCategoryCardState();
 }
 
-class _CinematicCategoryCardState
-    extends State<_CinematicCategoryCard>
+class _MinimalCategoryCardState
+    extends State<_MinimalCategoryCard>
     with SingleTickerProviderStateMixin {
   bool _pressed = false;
 
@@ -1017,7 +741,7 @@ class _CinematicCategoryCardState
 
     _motionController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: const Duration(seconds: 14),
     )..repeat(reverse: true);
   }
 
@@ -1031,41 +755,29 @@ class _CinematicCategoryCardState
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) {
-        setState(() {
-          _pressed = true;
-        });
+        setState(() => _pressed = true);
       },
       onTapCancel: () {
-        setState(() {
-          _pressed = false;
-        });
+        setState(() => _pressed = false);
       },
       onTapUp: (_) {
-        setState(() {
-          _pressed = false;
-        });
-
+        setState(() => _pressed = false);
         widget.onTap();
       },
       child: AnimatedScale(
-        scale: _pressed ? .95 : 1,
-        duration: const Duration(
-          milliseconds: 180,
-        ),
+        scale: _pressed ? .975 : 1,
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         child: Hero(
           tag: 'category-${widget.title}',
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(34.r),
+            borderRadius: BorderRadius.circular(22.r),
             child: SizedBox(
               height: widget.height,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // ==================================================
-                  // SLOW IMAGE MOVEMENT
-                  // ==================================================
-
+                  // IMAGE
                   AnimatedBuilder(
                     animation: _motionController,
                     builder: (context, child) {
@@ -1074,19 +786,13 @@ class _CinematicCategoryCardState
                         _motionController.value,
                       );
 
-                      final scale =
-                          1.045 + (progress * .045);
-
-                      final dx =
-                          (progress - .5) * 7;
-
-                      final dy =
-                          (progress - .5) * 5;
-
                       return Transform.translate(
-                        offset: Offset(dx, dy),
+                        offset: Offset(
+                          (progress - .5) * 4,
+                          (progress - .5) * 5,
+                        ),
                         child: Transform.scale(
-                          scale: scale,
+                          scale: 1.025 + progress * .025,
                           child: child,
                         ),
                       );
@@ -1094,11 +800,10 @@ class _CinematicCategoryCardState
                     child: widget.thumbnail.isEmpty
                         ? Container(
                       color: widget.fallback,
-                      alignment: Alignment.center,
                       child: Icon(
                         Icons.image_outlined,
                         color: widget.muted,
-                        size: 30.sp,
+                        size: 28.sp,
                       ),
                     )
                         : Image.network(
@@ -1113,17 +818,14 @@ class _CinematicCategoryCardState
                           child: Icon(
                             Icons.broken_image_outlined,
                             color: widget.muted,
-                            size: 28.sp,
+                            size: 27.sp,
                           ),
                         );
                       },
                     ),
                   ),
 
-                  // ==================================================
-                  // CINEMATIC VIGNETTE
-                  // ==================================================
-
+                  // SOFT GRADIENT
                   const Positioned.fill(
                     child: IgnorePointer(
                       child: DecoratedBox(
@@ -1131,184 +833,113 @@ class _CinematicCategoryCardState
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            stops: [
-                              0,
-                              .30,
-                              .62,
-                              1,
-                            ],
                             colors: [
-                              Color(0x1A000000),
+                              Color(0x08000000),
                               Colors.transparent,
-                              Color(0x42000000),
-                              Color(0xF0000000),
+                              Color(0xD9000000),
                             ],
+                            stops: [0, .52, 1],
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // ==================================================
-                  // SIDE VIGNETTE
-                  // ==================================================
-
-                  const Positioned.fill(
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Color(0x30000000),
-                              Colors.transparent,
-                              Color(0x18000000),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // TOP INDEX
-                  // ==================================================
-
+                  // TOP LABEL
                   Positioned(
-                    top: 17.h,
-                    left: 17.w,
-                    child: Row(
-                      children: [
-                        Text(
-                          (widget.index + 1)
-                              .toString()
-                              .padLeft(2, '0'),
-                          style: GoogleFonts.inter(
-                            color:
-                            Colors.white.withOpacity(.72),
-                            fontSize: 9.sp,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.8,
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
-                        AnimatedContainer(
-                          duration: const Duration(
-                            milliseconds: 350,
-                          ),
-                          width: _pressed ? 28.w : 18.w,
-                          height: 1,
-                          color:
-                          widget.accent.withOpacity(
-                            _pressed ? .85 : .45,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ==================================================
-                  // TOP RIGHT ACCENT
-                  // ==================================================
-
-                  Positioned(
-                    top: 18.h,
-                    right: 18.w,
-                    child: AnimatedContainer(
-                      duration: const Duration(
-                        milliseconds: 350,
+                    top: 13.h,
+                    left: 13.w,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 9.w,
+                        vertical: 6.h,
                       ),
-                      width: _pressed ? 11.w : 7.w,
-                      height: _pressed ? 11.w : 7.w,
                       decoration: BoxDecoration(
-                        color: widget.accent,
+                        color: Colors.black.withOpacity(.20),
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: Text(
+                        '${(widget.index + 1).toString().padLeft(2, '0')}',
+                        style: GoogleFonts.manrope(
+                          color: Colors.white.withOpacity(.9),
+                          fontSize: 8.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ARROW
+                  Positioned(
+                    top: 13.h,
+                    right: 13.w,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 30.w,
+                      height: 30.w,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(
+                          _pressed ? .45 : .22,
+                        ),
                         shape: BoxShape.circle,
                       ),
+                      child: Icon(
+                        Icons.arrow_outward_rounded,
+                        color: Colors.white,
+                        size: 14.sp,
+                      ),
                     ),
                   ),
 
-                  // ==================================================
-                  // BOTTOM CONTENT
-                  // ==================================================
-
+                  // CONTENT
                   Positioned(
-                    left: 18.w,
-                    right: 18.w,
-                    bottom: 18.h,
+                    left: 14.w,
+                    right: 14.w,
+                    bottom: 14.h,
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          '${widget.wallpaperCount} wallpapers',
+                          style: GoogleFonts.manrope(
+                            color: Colors.white.withOpacity(.68),
+                            fontSize: 8.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        SizedBox(height: 5.h),
+
+                        Text(
+                          widget.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            color: Colors.white,
+                            fontSize: 22.sp,
+                            fontWeight: FontWeight.w700,
+                            height: 1.0,
+                            letterSpacing: -0.7,
+                          ),
+                        ),
+
+                        SizedBox(height: 10.h),
+
                         Row(
                           children: [
+                            Expanded(
+                              child: Container(
+                                height: 1,
+                                color: Colors.white.withOpacity(.25),
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
                             Container(
                               width: 5.w,
                               height: 5.w,
                               decoration: BoxDecoration(
                                 color: widget.accent,
                                 shape: BoxShape.circle,
-                              ),
-                            ),
-                            SizedBox(width: 7.w),
-                            Expanded(
-                              child: Text(
-                                '${widget.wallpaperCount} WALLPAPERS',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  color:
-                                  Colors.white.withOpacity(.70),
-                                  fontSize: 8.sp,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(height: 8.h),
-
-                        Text(
-                          widget.title.toUpperCase(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.bebasNeue(
-                            color: Colors.white,
-                            fontSize: 45.sp,
-                            height: .80,
-                            letterSpacing: 1.8,
-                          ),
-                        ),
-
-                        SizedBox(height: 11.h),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AnimatedContainer(
-                                duration: const Duration(
-                                  milliseconds: 500,
-                                ),
-                                height: 1,
-                                color:
-                                widget.accent.withOpacity(
-                                  _pressed ? .70 : .28,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 10.w),
-                            AnimatedRotation(
-                              turns: _pressed ? .12 : 0,
-                              duration: const Duration(
-                                milliseconds: 300,
-                              ),
-                              child: Icon(
-                                Icons.arrow_outward_rounded,
-                                color:
-                                Colors.white.withOpacity(.78),
-                                size: 15.sp,
                               ),
                             ),
                           ],
@@ -1326,37 +957,18 @@ class _CinematicCategoryCardState
         .animate()
         .fadeIn(
       delay: Duration(
-        milliseconds: widget.index * 120,
+        milliseconds: widget.index * 70,
       ),
-      duration: const Duration(
-        milliseconds: 900,
-      ),
+      duration: const Duration(milliseconds: 550),
     )
         .moveY(
-      begin: 90,
+      begin: 30,
       end: 0,
       delay: Duration(
-        milliseconds: widget.index * 120,
+        milliseconds: widget.index * 70,
       ),
-      duration: const Duration(
-        milliseconds: 950,
-      ),
-      curve: Curves.easeOutExpo,
-    )
-        .scale(
-      begin: const Offset(.90, .90),
-      end: const Offset(1, 1),
-      duration: const Duration(
-        milliseconds: 950,
-      ),
-      curve: Curves.easeOutExpo,
-    )
-        .blurXY(
-      begin: 4,
-      end: 0,
-      duration: const Duration(
-        milliseconds: 800,
-      ),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutCubic,
     );
   }
 }

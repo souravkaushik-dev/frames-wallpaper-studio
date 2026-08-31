@@ -1,27 +1,42 @@
-import 'package:dotty/constants/app_colors.dart';
-import 'package:dotty/onboarding/onboard.dart';
-import 'package:dotty/screens/bottom_nav.dart';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../screens/bottom_nav.dart';
+import 'onboard.dart';
 
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({
+class FoliageSplashScreen extends StatefulWidget {
+  const FoliageSplashScreen({
     super.key,
   });
 
   @override
-  State<SplashScreen> createState() =>
-      _SplashScreenState();
+  State<FoliageSplashScreen> createState() =>
+      _FoliageSplashScreenState();
 }
 
-class _SplashScreenState
-    extends State<SplashScreen>
+class _FoliageSplashScreenState
+    extends State<FoliageSplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+  // ===========================================================================
+  // ANIMATION
+  // ===========================================================================
+
+  late final AnimationController _controller;
+
+  // ===========================================================================
+  // STARTUP
+  // ===========================================================================
+
+  bool _opening = false;
+
+  // ===========================================================================
+  // INIT
+  // ===========================================================================
 
   @override
   void initState() {
@@ -37,51 +52,193 @@ class _SplashScreenState
     _openApp();
   }
 
+  // ===========================================================================
+  // DISPOSE
+  // ===========================================================================
+
   @override
   void dispose() {
     _controller.dispose();
+
     super.dispose();
   }
 
+  // ===========================================================================
+  // OPEN APP
+  // ===========================================================================
+
   Future<void> _openApp() async {
+    try {
+      final prefs =
+      await SharedPreferences.getInstance();
+
+      final onboardingDone =
+          prefs.getBool(
+            'foliage_onboarding_completed',
+          ) ??
+              false;
+
+      // -----------------------------------------------------------------------
+      // Keep the Foliage splash on screen long enough to feel intentional.
+      // -----------------------------------------------------------------------
+
+      await Future.delayed(
+        const Duration(
+          milliseconds: 2400,
+        ),
+      );
+
+      if (!mounted || _opening) {
+        return;
+      }
+
+      _opening = true;
+
+      HapticFeedback.selectionClick();
+
+      // -----------------------------------------------------------------------
+      // DECIDE WHERE TO GO
+      // -----------------------------------------------------------------------
+
+      final Widget nextScreen;
+
+      if (onboardingDone) {
+        nextScreen = const MainScreen(
+          recentWallpapers: [],
+        );
+      } else {
+        nextScreen = FoliageOnboardingScreen(
+          onCompleted: _finishOnboarding,
+        );
+      }
+
+      // -----------------------------------------------------------------------
+      // REPLACE SPLASH
+      // -----------------------------------------------------------------------
+
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration:
+          const Duration(
+            milliseconds: 800,
+          ),
+          reverseTransitionDuration:
+          const Duration(
+            milliseconds: 500,
+          ),
+          pageBuilder: (
+              context,
+              animation,
+              secondaryAnimation,
+              ) {
+            return nextScreen;
+          },
+          transitionsBuilder: (
+              context,
+              animation,
+              secondaryAnimation,
+              child,
+              ) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              ),
+              child: child,
+            );
+          },
+        ),
+      );
+    } catch (error) {
+      debugPrint(
+        'Foliage splash startup error: $error',
+      );
+
+      if (!mounted || _opening) {
+        return;
+      }
+
+      _opening = true;
+
+      // -----------------------------------------------------------------------
+      // If preferences fail, show onboarding rather than leaving the user
+      // stuck on the splash screen.
+      // -----------------------------------------------------------------------
+
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration:
+          const Duration(
+            milliseconds: 800,
+          ),
+          pageBuilder: (
+              context,
+              animation,
+              secondaryAnimation,
+              ) {
+            return FoliageOnboardingScreen(
+              onCompleted: _finishOnboarding,
+            );
+          },
+          transitionsBuilder: (
+              context,
+              animation,
+              secondaryAnimation,
+              child,
+              ) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              ),
+              child: child,
+            );
+          },
+        ),
+      );
+    }
+  }
+
+  // ===========================================================================
+  // ONBOARDING COMPLETE
+  // ===========================================================================
+
+  Future<void> _finishOnboarding(
+      String name,
+      ) async {
     final prefs =
     await SharedPreferences.getInstance();
 
-    final onboardingDone =
-        prefs.getBool(
-          'onboarding_done',
-        ) ??
-            false;
-
-    await Future.delayed(
-      const Duration(
-        milliseconds: 2400,
-      ),
+    await prefs.setBool(
+      'foliage_onboarding_completed',
+      true,
     );
 
-    if (!mounted) return;
+    await prefs.setString(
+      'foliage_user_name',
+      name,
+    );
 
-    final nextScreen = onboardingDone
-        ? const MainScreen(
-      recentWallpapers: [],
-    )
-        : const OnboardingScreen();
+    if (!mounted) {
+      return;
+    }
 
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).pushAndRemoveUntil(
       PageRouteBuilder(
         transitionDuration:
         const Duration(
-          milliseconds: 800,
+          milliseconds: 700,
         ),
-        pageBuilder:
-            (
+        pageBuilder: (
             context,
             animation,
             secondaryAnimation,
-            ) =>
-        nextScreen,
-        transitionsBuilder:
-            (
+            ) {
+          return const MainScreen(
+            recentWallpapers: [],
+          );
+        },
+        transitionsBuilder: (
             context,
             animation,
             secondaryAnimation,
@@ -90,76 +247,100 @@ class _SplashScreenState
           return FadeTransition(
             opacity: CurvedAnimation(
               parent: animation,
-              curve:
-              Curves.easeOutCubic,
+              curve: Curves.easeOutCubic,
             ),
             child: child,
           );
         },
       ),
+          (route) => false,
     );
   }
+
+  // ===========================================================================
+  // BUILD
+  // ===========================================================================
 
   @override
   Widget build(
       BuildContext context,
       ) {
+    final theme =
+    Theme.of(context);
+
     final isDark =
-        Theme.of(context).brightness ==
+        theme.brightness ==
             Brightness.dark;
 
+    // -------------------------------------------------------------------------
+    // FOLIAGE COLORS
+    // -------------------------------------------------------------------------
+
     final background = isDark
-        ? AppColors.darkBackground
-        : AppColors.lightBackground;
+        ? const Color(0xFF07100C)
+        : const Color(0xFFF5F7F2);
 
     final primary = isDark
-        ? AppColors.darkPrimary
-        : AppColors.lightPrimary;
+        ? const Color(0xFFF2F5F0)
+        : const Color(0xFF101712);
 
     final secondary = isDark
-        ? AppColors.darkSecondary
-        : AppColors.lightSecondary;
+        ? Colors.white.withValues(
+      alpha: .65,
+    )
+        : const Color(0xFF536057);
 
     final muted = isDark
-        ? AppColors.darkMuted
-        : AppColors.lightMuted;
+        ? Colors.white.withValues(
+      alpha: .38,
+    )
+        : const Color(0xFF69736B);
 
     final surface = isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
+        ? Colors.white.withValues(
+      alpha: .08,
+    )
+        : Colors.white.withValues(
+      alpha: .82,
+    );
 
-    final accent =
-        AppColors.accent;
+    final accent = isDark
+        ? const Color(0xFFA5C99F)
+        : const Color(0xFF5E8962);
 
     return Scaffold(
-      backgroundColor:
-      background,
-
+      backgroundColor: background,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // Subtle cinematic background
+          // ===================================================================
+          // CINEMATIC BACKGROUND
+          // ===================================================================
+
           Positioned.fill(
             child: AnimatedBuilder(
               animation: _controller,
-              builder:
-                  (context, child) {
+              builder: (
+                  context,
+                  child,
+                  ) {
                 return DecoratedBox(
-                  decoration:
-                  BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient:
                     RadialGradient(
                       center: Alignment(
                         0,
                         -.25 +
-                            (_controller.value *
+                            (_controller
+                                .value *
                                 .08),
                       ),
-                      radius: .9,
+                      radius: .95,
                       colors: [
-                        accent.withOpacity(
-                          isDark
-                              ? .035
-                              : .025,
+                        accent.withValues(
+                          alpha: isDark
+                              ? .075
+                              : .045,
                         ),
                         background,
                       ],
@@ -170,6 +351,80 @@ class _SplashScreenState
             ),
           ),
 
+          // ===================================================================
+          // ORGANIC GLOW - TOP RIGHT
+          // ===================================================================
+
+          Positioned(
+            top: -100.h,
+            right: -90.w,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (
+                  context,
+                  child,
+                  ) {
+                return Transform.translate(
+                  offset: Offset(
+                    10 *
+                        _controller
+                            .value,
+                    5 *
+                        math.sin(
+                          _controller
+                              .value *
+                              3.14,
+                        ),
+                  ),
+                  child: child,
+                );
+              },
+              child: Container(
+                width: 260.w,
+                height: 260.w,
+                decoration:
+                BoxDecoration(
+                  shape:
+                  BoxShape.circle,
+                  color:
+                  accent.withValues(
+                    alpha: isDark
+                        ? .035
+                        : .025,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ===================================================================
+          // ORGANIC GLOW - BOTTOM LEFT
+          // ===================================================================
+
+          Positioned(
+            bottom: -120.h,
+            left: -110.w,
+            child: Container(
+              width: 300.w,
+              height: 300.w,
+              decoration:
+              BoxDecoration(
+                shape:
+                BoxShape.circle,
+                color:
+                accent.withValues(
+                  alpha: isDark
+                      ? .025
+                      : .018,
+                ),
+              ),
+            ),
+          ),
+
+          // ===================================================================
+          // CENTER BRAND
+          // ===================================================================
+
           SafeArea(
             child: Center(
               child: Padding(
@@ -177,20 +432,19 @@ class _SplashScreenState
                 EdgeInsets.symmetric(
                   horizontal: 32.w,
                 ),
-
                 child: Column(
                   mainAxisAlignment:
-                  MainAxisAlignment.center,
-
+                  MainAxisAlignment
+                      .center,
                   children: [
-                    // Minimal frame mark
-                    _FrameIcon(
-                      primary:
-                      primary,
-                      accent:
-                      accent,
-                      surface:
-                      surface,
+                    // =========================================================
+                    // FOLIAGE MARK
+                    // =========================================================
+
+                    _FoliageSplashMark(
+                      primary: primary,
+                      accent: accent,
+                      surface: surface,
                     )
                         .animate(
                       controller:
@@ -203,8 +457,8 @@ class _SplashScreenState
                         .scale(
                       begin:
                       const Offset(
-                        .88,
-                        .88,
+                        .86,
+                        .86,
                       ),
                       end:
                       const Offset(
@@ -222,19 +476,19 @@ class _SplashScreenState
                       height: 22.h,
                     ),
 
-                    // Small brand
+                    // =========================================================
+                    // BRAND
+                    // =========================================================
+
                     Text(
-                      'FRAMES',
+                      'FOLIAGE',
                       style:
                       GoogleFonts.inter(
-                        color:
-                        primary,
-                        fontSize:
-                        22.sp,
+                        color: primary,
+                        fontSize: 22.sp,
                         fontWeight:
                         FontWeight.w700,
-                        letterSpacing:
-                        4.5,
+                        letterSpacing: 4.5,
                       ),
                     )
                         .animate(
@@ -248,10 +502,8 @@ class _SplashScreenState
                       650.ms,
                     )
                         .moveY(
-                      begin:
-                      10,
-                      end:
-                      0,
+                      begin: 10,
+                      end: 0,
                       duration:
                       650.ms,
                       curve:
@@ -263,18 +515,19 @@ class _SplashScreenState
                       height: 9.h,
                     ),
 
+                    // =========================================================
+                    // SUBTITLE
+                    // =========================================================
+
                     Text(
                       'CURATED WALLPAPERS',
                       style:
                       GoogleFonts.inter(
-                        color:
-                        secondary,
-                        fontSize:
-                        8.sp,
+                        color: secondary,
+                        fontSize: 8.sp,
                         fontWeight:
                         FontWeight.w600,
-                        letterSpacing:
-                        2,
+                        letterSpacing: 2,
                       ),
                     )
                         .animate(
@@ -292,19 +545,28 @@ class _SplashScreenState
                       height: 48.h,
                     ),
 
-                    // Minimal progress
+                    // =========================================================
+                    // PROGRESS
+                    // =========================================================
+
                     SizedBox(
-                      width:
-                      110.w,
+                      width: 110.w,
                       child:
                       AnimatedBuilder(
                         animation:
                         _controller,
-                        builder:
-                            (
+                        builder: (
                             context,
                             child,
                             ) {
+                          final progress =
+                          Curves
+                              .easeInOut
+                              .transform(
+                            _controller
+                                .value,
+                          );
+
                           return Column(
                             children: [
                               ClipRRect(
@@ -315,11 +577,11 @@ class _SplashScreenState
                                 ),
                                 child:
                                 Container(
-                                  height:
-                                  2.h,
+                                  height: 2.h,
                                   color:
                                   muted
-                                      .withOpacity(
+                                      .withValues(
+                                    alpha:
                                     .15,
                                   ),
                                   child:
@@ -330,12 +592,7 @@ class _SplashScreenState
                                     child:
                                     FractionallySizedBox(
                                       widthFactor:
-                                      Curves
-                                          .easeInOut
-                                          .transform(
-                                        _controller
-                                            .value,
-                                      ),
+                                      progress,
                                       child:
                                       Container(
                                         decoration:
@@ -353,12 +610,9 @@ class _SplashScreenState
                                   ),
                                 ),
                               ),
-
                               SizedBox(
-                                height:
-                                9.h,
+                                height: 9.h,
                               ),
-
                               Text(
                                 'LOADING',
                                 style:
@@ -396,27 +650,26 @@ class _SplashScreenState
             ),
           ),
 
-          // Bottom version
+          // ===================================================================
+          // BOTTOM BRAND
+          // ===================================================================
+
           Positioned(
             left: 0,
             right: 0,
             bottom: 26.h,
             child: Text(
-              'FRAMES',
+              'FOLIAGE',
               textAlign:
               TextAlign.center,
-              style:
-              GoogleFonts.inter(
-                color:
-                muted.withOpacity(
-                  .65,
+              style: GoogleFonts.inter(
+                color: muted.withValues(
+                  alpha: .65,
                 ),
-                fontSize:
-                7.sp,
+                fontSize: 7.sp,
                 fontWeight:
                 FontWeight.w600,
-                letterSpacing:
-                2,
+                letterSpacing: 2,
               ),
             )
                 .animate(
@@ -436,21 +689,21 @@ class _SplashScreenState
   }
 }
 
-// ================================================================
-// MINIMAL FRAME ICON
-// ================================================================
+// =============================================================================
+// FOLIAGE SPLASH MARK
+// =============================================================================
 
-class _FrameIcon
+class _FoliageSplashMark
     extends StatelessWidget {
-  final Color primary;
-  final Color accent;
-  final Color surface;
-
-  const _FrameIcon({
+  const _FoliageSplashMark({
     required this.primary,
     required this.accent,
     required this.surface,
   });
+
+  final Color primary;
+  final Color accent;
+  final Color surface;
 
   @override
   Widget build(
@@ -461,17 +714,19 @@ class _FrameIcon
       height: 62.w,
       child: Stack(
         children: [
+          // -------------------------------------------------------------------
+          // OUTER CONTAINER
+          // -------------------------------------------------------------------
+
           Positioned.fill(
             child: Container(
               decoration:
               BoxDecoration(
-                color:
-                surface,
-                border:
-                Border.all(
+                color: surface,
+                border: Border.all(
                   color:
-                  primary.withOpacity(
-                    .12,
+                  primary.withValues(
+                    alpha: .12,
                   ),
                 ),
                 borderRadius:
@@ -482,6 +737,10 @@ class _FrameIcon
             ),
           ),
 
+          // -------------------------------------------------------------------
+          // INNER FRAME
+          // -------------------------------------------------------------------
+
           Positioned(
             left: 9.w,
             top: 9.w,
@@ -490,21 +749,36 @@ class _FrameIcon
             child: Container(
               decoration:
               BoxDecoration(
-                border:
-                Border.all(
+                border: Border.all(
                   color:
-                  accent.withOpacity(
-                    .55,
+                  accent.withValues(
+                    alpha: .55,
                   ),
                   width: 1.4,
                 ),
                 borderRadius:
                 BorderRadius.circular(
-                  9.r,
+                  10.r,
                 ),
               ),
             ),
           ),
+
+          // -------------------------------------------------------------------
+          // LEAF
+          // -------------------------------------------------------------------
+
+          Center(
+            child: Icon(
+              Icons.eco_rounded,
+              color: accent,
+              size: 24.sp,
+            ),
+          ),
+
+          // -------------------------------------------------------------------
+          // DETAIL DOT
+          // -------------------------------------------------------------------
 
           Positioned(
             right: 6.w,

@@ -3,6 +3,7 @@ import 'package:dotty/constants/app_colors.dart';
 import 'package:dotty/models/category_model.dart';
 import 'package:dotty/screens/favorite_screen.dart';
 import 'package:dotty/screens/home_screen.dart';
+import 'package:dotty/screens/preference_screen.dart';
 import 'package:dotty/screens/recent_screen.dart';
 
 import 'package:flutter/material.dart';
@@ -112,6 +113,9 @@ class _MainScreenState
           recentWallpapers:
           recentWallpapers,
         );
+
+      case 4:
+        return const PreferencesScreen();
 
       default:
         return const HomeScreen();
@@ -477,6 +481,26 @@ class _MainScreenState
           label:
           'Recent',
         ),
+
+        SizedBox(
+          width:
+          2.w,
+        ),
+
+        _navigationItem(
+          index: 4,
+
+          icon:
+          Hicons
+              .settingLightOutline,
+
+          activeIcon:
+          Hicons
+              .settingBold,
+
+          label:
+          'Settings',
+        ),
       ],
     );
   }
@@ -511,7 +535,7 @@ class _MainScreenState
 
               children:
               List.generate(
-                4,
+                5,
                 _buildPage,
               ),
             ),

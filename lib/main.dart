@@ -53,7 +53,7 @@ class MyApp extends StatelessWidget {
           _buildDarkTheme(),
 
           home:
-          const SplashScreen(),
+          const FoliageSplashScreen(),
         );
       },
     );
