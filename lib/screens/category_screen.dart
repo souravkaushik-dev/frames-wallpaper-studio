@@ -2,12 +2,11 @@ import 'package:dotty/constants/app_colors.dart';
 import 'package:dotty/screens/previewscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class CategoryScreen extends StatelessWidget {
+class CategoryScreen extends StatefulWidget {
   final String title;
   final List<String> wallpapers;
 
@@ -17,13 +16,42 @@ class CategoryScreen extends StatelessWidget {
     required this.wallpapers,
   });
 
+  @override
+  State<CategoryScreen> createState() => _CategoryScreenState();
+}
+
+class _CategoryScreenState extends State<CategoryScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _introController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _introController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _introController.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _introController.dispose();
+    super.dispose();
+  }
+
   // ============================================================
-  // THEME COLORS
+  // THEME
   // ============================================================
 
   bool _isDark(BuildContext context) {
-    return Theme.of(context).brightness ==
-        Brightness.dark;
+    return Theme.of(context).brightness == Brightness.dark;
   }
 
   Color _background(BuildContext context) {
@@ -76,509 +104,210 @@ class CategoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg =
-    _background(context);
-
-    final text =
-    _primary(context);
-
-    final secondary =
-    _secondary(context);
-
-    final muted =
-    _muted(context);
-
-    final divider =
-    _divider(context);
-
-    final heights = [
-      360.h,
-      280.h,
-      410.h,
-      315.h,
-    ];
+    final bg = _background(context);
+    final surface = _surface(context);
+    final surfaceSoft = _surfaceSoft(context);
+    final primary = _primary(context);
+    final secondary = _secondary(context);
+    final muted = _muted(context);
+    final divider = _divider(context);
 
     return Scaffold(
       backgroundColor: bg,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            cacheExtent: 800,
+            slivers: [
+              // ======================================================
+              // HEADER
+              // ======================================================
 
-      body: CustomScrollView(
-        physics:
-        const BouncingScrollPhysics(
-          parent:
-          AlwaysScrollableScrollPhysics(),
-        ),
-
-        slivers: [
-          // ========================================================
-          // HEADER
-          // ========================================================
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding:
-              EdgeInsets.fromLTRB(
-                20.w,
-                62.h,
-                20.w,
-                10.h,
+              SliverToBoxAdapter(
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16.w,
+                      12.h,
+                      16.w,
+                      0,
+                    ),
+                    child: _Header(
+                      title: widget.title,
+                      count: widget.wallpapers.length,
+                      surface: surface,
+                      surfaceSoft: surfaceSoft,
+                      divider: divider,
+                      primary: primary,
+                      secondary: secondary,
+                      accent: _accent,
+                      onBack: () {
+                        HapticFeedback.selectionClick();
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ),
+                ),
               ),
 
-              child: Row(
-                crossAxisAlignment:
-                CrossAxisAlignment.center,
+              // ======================================================
+              // HERO
+              // ======================================================
 
-                children: [
-                  _BackButton(
-                    color: text,
+              SliverToBoxAdapter(
+                child: _AnimatedIntro(
+                  controller: _introController,
+                  child: _Hero(
+                    image: widget.wallpapers.isEmpty
+                        ? null
+                        : widget.wallpapers.first,
+                    title: widget.title,
+                    count: widget.wallpapers.length,
+                    background: bg,
+                    surface: surface,
+                    primary: primary,
+                    secondary: secondary,
+                    muted: muted,
+                    divider: divider,
                     accent: _accent,
-                  ),
-
-                  SizedBox(
-                    width: 18.w,
-                  ),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
-
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 6.w,
-                              height: 6.w,
-
-                              decoration:
-                              BoxDecoration(
-                                color:
-                                _accent,
-                                shape:
-                                BoxShape.circle,
-                              ),
-                            ),
-
-                            SizedBox(
-                              width: 8.w,
-                            ),
-
-                            Text(
-                              'COLLECTION',
-
-                              style:
-                              GoogleFonts.inter(
-                                color:
-                                secondary,
-                                fontSize:
-                                9.sp,
-                                fontWeight:
-                                FontWeight.w800,
-                                letterSpacing:
-                                2,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(
-                          height: 5.h,
-                        ),
-
-                        Text(
-                          title.toUpperCase(),
-
-                          maxLines: 1,
-
-                          overflow:
-                          TextOverflow.ellipsis,
-
-                          style:
-                          GoogleFonts.bebasNeue(
-                            color:
-                            text,
-                            fontSize:
-                            44.sp,
-                            height:
-                            .82,
-                            letterSpacing:
-                            2.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ==================================================
-                  // NUMBER
-                  // ==================================================
-
-                  Container(
-                    width: 44.w,
-                    height: 44.w,
-
-                    decoration:
-                    BoxDecoration(
-                      color:
-                      _accent.withOpacity(
-                        .06,
-                      ),
-
-                      shape:
-                      BoxShape.circle,
-
-                      border:
-                      Border.all(
-                        color:
-                        divider,
-                      ),
-                    ),
-
-                    child: Center(
-                      child: Text(
-                        wallpapers.length
-                            .toString()
-                            .padLeft(
-                          2,
-                          '0',
-                        ),
-
-                        style:
-                        GoogleFonts.inter(
-                          color:
-                          text,
-                          fontSize:
-                          10.sp,
-                          fontWeight:
-                          FontWeight.w800,
-                          letterSpacing:
-                          1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-                .animate()
-                .fadeIn(
-              duration:
-              const Duration(
-                milliseconds: 600,
-              ),
-            )
-                .moveY(
-              begin: -25,
-              end: 0,
-              curve:
-              Curves.easeOutExpo,
-            ),
-          ),
-
-          // ========================================================
-          // CINEMATIC INTRO
-          // ========================================================
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding:
-              EdgeInsets.fromLTRB(
-                24.w,
-                22.h,
-                24.w,
-                30.h,
-              ),
-
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-
-                children: [
-                  Text(
-                    'A VISUAL WORLD',
-
-                    style:
-                    GoogleFonts.bebasNeue(
-                      color:
-                      text,
-                      fontSize:
-                      48.sp,
-                      height:
-                      .82,
-                      letterSpacing:
-                      2,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(
-                    delay:
-                    const Duration(
-                      milliseconds: 180,
-                    ),
-                    duration:
-                    const Duration(
-                      milliseconds: 800,
-                    ),
-                  )
-                      .moveY(
-                    begin: 45,
-                    end: 0,
-                    duration:
-                    const Duration(
-                      milliseconds: 850,
-                    ),
-                    curve:
-                    Curves.easeOutExpo,
-                  ),
-
-                  SizedBox(
-                    height: 12.h,
-                  ),
-
-                  SizedBox(
-                    width: 335.w,
-
-                    child: Text(
-                      '${wallpapers.length} curated wallpapers crafted around the atmosphere, mood and visual identity of $title.',
-
-                      style:
-                      GoogleFonts.inter(
-                        color:
-                        secondary,
-                        fontSize:
-                        13.sp,
-                        height:
-                        1.7,
-                        fontWeight:
-                        FontWeight.w500,
-                      ),
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(
-                    delay:
-                    const Duration(
-                      milliseconds: 320,
-                    ),
-                    duration:
-                    const Duration(
-                      milliseconds: 700,
-                    ),
-                  )
-                      .moveY(
-                    begin: 20,
-                    end: 0,
-                    curve:
-                    Curves.easeOutExpo,
-                  ),
-
-                  SizedBox(
-                    height: 22.h,
-                  ),
-
-                  // ==================================================
-                  // META ROW
-                  // ==================================================
-
-                  Row(
-                    children: [
-                      _MetaItem(
-                        number:
-                        wallpapers.length
-                            .toString()
-                            .padLeft(
-                          2,
-                          '0',
-                        ),
-                        label:
-                        'WALLPAPERS',
-                        color:
-                        text,
-                      ),
-
-                      SizedBox(
-                        width: 20.w,
-                      ),
-
-                      _MetaDivider(
-                        color:
-                        divider,
-                      ),
-
-                      SizedBox(
-                        width: 20.w,
-                      ),
-
-                      _MetaItem(
-                        number:
-                        '4K',
-                        label:
-                        'QUALITY',
-                        color:
-                        text,
-                      ),
-
-                      SizedBox(
-                        width: 20.w,
-                      ),
-
-                      _MetaDivider(
-                        color:
-                        divider,
-                      ),
-
-                      SizedBox(
-                        width: 20.w,
-                      ),
-
-                      _MetaItem(
-                        number:
-                        '∞',
-                        label:
-                        'MOOD',
-                        color:
-                        text,
-                      ),
-                    ],
-                  )
-                      .animate()
-                      .fadeIn(
-                    delay:
-                    const Duration(
-                      milliseconds: 450,
-                    ),
-                  )
-                      .moveY(
-                    begin: 20,
-                    end: 0,
-                    curve:
-                    Curves.easeOutExpo,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // ========================================================
-          // EMPTY
-          // ========================================================
-
-          if (wallpapers.isEmpty)
-            SliverFillRemaining(
-              child: _EmptyState(
-                text:
-                text,
-                secondary:
-                secondary,
-                accent:
-                _accent,
-              ),
-            )
-
-          // ========================================================
-          // WALLPAPER GRID
-          // ========================================================
-
-          else
-            SliverPadding(
-              padding:
-              EdgeInsets.symmetric(
-                horizontal: 18.w,
-              ),
-
-              sliver:
-              SliverMasonryGrid.count(
-                crossAxisCount: 2,
-
-                mainAxisSpacing:
-                14.h,
-
-                crossAxisSpacing:
-                14.w,
-
-                childCount:
-                wallpapers.length,
-
-                itemBuilder:
-                    (
-                    context,
-                    index,
-                    ) {
-                  final image =
-                  wallpapers[index];
-
-                  return _CinematicWallpaperCard(
-                    image:
-                    image,
-
-                    index:
-                    index,
-
-                    title:
-                    title,
-
-                    height:
-                    heights[
-                    index % 4],
-
-                    accent:
-                    _accent,
-
-                    onTap:
-                        () {
+                    onTap: widget.wallpapers.isEmpty
+                        ? null
+                        : () {
                       _openPreview(
                         context,
-                        image,
+                        widget.wallpapers.first,
                       );
                     },
-                  );
-                },
-              ),
-            ),
-
-          // ========================================================
-          // END
-          // ========================================================
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding:
-              EdgeInsets.symmetric(
-                vertical: 80.h,
+                  ),
+                ),
               ),
 
-              child: Column(
-                children: [
-                  Container(
-                    width: 34.w,
-                    height: 1,
-                    color:
-                    divider,
+              // ======================================================
+              // SMALL SECTION TITLE
+              // ======================================================
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20.w,
+                    2.h,
+                    20.w,
+                    14.h,
                   ),
-
-                  SizedBox(
-                    height: 12.h,
-                  ),
-
-                  Text(
-                    'END OF COLLECTION',
-
-                    style:
-                    GoogleFonts.inter(
-                      color:
-                      muted.withOpacity(
-                        .55,
+                  child: Row(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'COLLECTION',
+                        style: GoogleFonts.bebasNeue(
+                          color: primary,
+                          fontSize: 28.sp,
+                          height: .9,
+                          letterSpacing: .2,
+                        ),
                       ),
-                      fontSize:
-                      8.sp,
-                      fontWeight:
-                      FontWeight.w800,
-                      letterSpacing:
-                      2.2,
-                    ),
+                      const Spacer(),
+                      Container(
+                        width: 6.w,
+                        height: 6.w,
+                        decoration: BoxDecoration(
+                          color: _accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      SizedBox(width: 7.w),
+                      Text(
+                        widget.wallpapers.length
+                            .toString()
+                            .padLeft(2, '0'),
+                        style: GoogleFonts.manrope(
+                          color: muted,
+                          fontSize: 8.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+
+              // ======================================================
+              // GRID
+              // ======================================================
+
+              if (widget.wallpapers.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _EmptyState(
+                    primary: primary,
+                    secondary: secondary,
+                    accent: _accent,
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    14.w,
+                    0,
+                    14.w,
+                    80.h,
+                  ),
+                  sliver: SliverMasonryGrid.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10.h,
+                    crossAxisSpacing: 10.w,
+                    childCount: widget.wallpapers.length,
+                    itemBuilder: (
+                        context,
+                        index,
+                        ) {
+                      final image =
+                      widget.wallpapers[index];
+
+                      return RepaintBoundary(
+                        key: ValueKey(image),
+                        child: _WallpaperCard(
+                          image: image,
+                          index: index,
+                          title: widget.title,
+                          accent: _accent,
+                          surface: surface,
+                          primary: primary,
+                          muted: muted,
+                          divider: divider,
+                          onTap: () {
+                            _openPreview(
+                              context,
+                              image,
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+              // ======================================================
+              // END
+              // ======================================================
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: 100.h,
+                  ),
+                  child: _EndMark(
+                    divider: divider,
+                    muted: muted,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -593,70 +322,46 @@ class CategoryScreen extends StatelessWidget {
       BuildContext context,
       String image,
       ) {
-    HapticFeedback
-        .selectionClick();
+    HapticFeedback.selectionClick();
 
     Navigator.push(
       context,
-
       PageRouteBuilder(
-        transitionDuration:
-        const Duration(
-          milliseconds: 850,
+        transitionDuration: const Duration(
+          milliseconds: 380,
         ),
-
-        reverseTransitionDuration:
-        const Duration(
-          milliseconds: 600,
+        reverseTransitionDuration: const Duration(
+          milliseconds: 260,
         ),
-
-        pageBuilder:
-            (
+        pageBuilder: (
             _,
             animation,
             __,
             ) {
           return PreviewScreen(
-            imageUrl:
-            image,
-            category:
-            title,
+            imageUrl: image,
+            category: widget.title,
           );
         },
-
-        transitionsBuilder:
-            (
+        transitionsBuilder: (
             _,
             animation,
             __,
             child,
             ) {
-          final curved =
-          CurvedAnimation(
-            parent:
-            animation,
-            curve:
-            Curves.easeOutExpo,
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
           );
 
           return FadeTransition(
-            opacity:
-            curved,
-
-            child:
-            ScaleTransition(
-              scale:
-              Tween<double>(
-                begin:
-                .94,
-                end:
-                1,
-              ).animate(
-                curved,
-              ),
-
-              child:
-              child,
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(
+                begin: .975,
+                end: 1,
+              ).animate(curved),
+              child: child,
             ),
           );
         },
@@ -665,185 +370,154 @@ class CategoryScreen extends StatelessWidget {
   }
 }
 
-// ==================================================================
-// BACK BUTTON
-// ==================================================================
+// ============================================================================
+// ANIMATED INTRO
+// ============================================================================
 
-class _BackButton
-    extends StatefulWidget {
-  final Color color;
-  final Color accent;
+class _AnimatedIntro extends StatelessWidget {
+  final AnimationController controller;
+  final Widget child;
 
-  const _BackButton({
-    required this.color,
-    required this.accent,
+  const _AnimatedIntro({
+    required this.controller,
+    required this.child,
   });
 
   @override
-  State<_BackButton> createState() =>
-      _BackButtonState();
-}
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (
+          context,
+          child,
+          ) {
+        final value = Curves.easeOutCubic.transform(
+          controller.value,
+        );
 
-class _BackButtonState
-    extends State<_BackButton> {
-  bool pressed = false;
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return GestureDetector(
-      onTapDown:
-          (_) {
-        setState(() {
-          pressed = true;
-        });
-      },
-
-      onTapCancel:
-          () {
-        setState(() {
-          pressed = false;
-        });
-      },
-
-      onTapUp:
-          (_) {
-        setState(() {
-          pressed = false;
-        });
-
-        HapticFeedback
-            .selectionClick();
-
-        Navigator.pop(context);
-      },
-
-      child:
-      AnimatedScale(
-        scale:
-        pressed ? .88 : 1,
-
-        duration:
-        const Duration(
-          milliseconds: 160,
-        ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        AnimatedContainer(
-          duration:
-          const Duration(
-            milliseconds: 250,
-          ),
-
-          width: 52.w,
-          height: 52.w,
-
-          decoration:
-          BoxDecoration(
-            shape:
-            BoxShape.circle,
-
-            color:
-            widget.accent.withOpacity(
-              pressed ? .10 : .04,
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(
+              0,
+              20.h * (1 - value),
             ),
-
-            border:
-            Border.all(
-              color:
-              pressed
-                  ? widget.accent
-                  .withOpacity(
-                .25,
-              )
-                  : widget.color
-                  .withOpacity(
-                .12,
-              ),
-            ),
+            child: child,
           ),
-
-          child:
-          Icon(
-            Icons
-                .arrow_back_ios_new_rounded,
-
-            color:
-            widget.color,
-
-            size:
-            18.sp,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-// ==================================================================
-// META ITEM
-// ==================================================================
+// ============================================================================
+// HEADER
+// ============================================================================
 
-class _MetaItem
-    extends StatelessWidget {
-  final String number;
-  final String label;
-  final Color color;
+class _Header extends StatelessWidget {
+  final String title;
+  final int count;
 
-  const _MetaItem({
-    required this.number,
-    required this.label,
-    required this.color,
+  final Color surface;
+  final Color surfaceSoft;
+  final Color divider;
+  final Color primary;
+  final Color secondary;
+  final Color accent;
+
+  final VoidCallback onBack;
+
+  const _Header({
+    required this.title,
+    required this.count,
+    required this.surface,
+    required this.surfaceSoft,
+    required this.divider,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+    required this.onBack,
   });
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        Text(
-          number,
+        _CircleButton(
+          icon: Icons.arrow_back_ios_new_rounded,
+          background: surfaceSoft,
+          border: divider,
+          foreground: primary,
+          onTap: onBack,
+        ),
 
-          style:
-          GoogleFonts.bebasNeue(
-            color:
-            color,
-            fontSize:
-            25.sp,
-            height:
-            .8,
-            letterSpacing:
-            1,
+        SizedBox(width: 12.w),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 5.w,
+                    height: 5.w,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(width: 7.w),
+                  Text(
+                    'ATMOSPHERE',
+                    style: GoogleFonts.manrope(
+                      color: secondary,
+                      fontSize: 7.sp,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.7,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 2.h),
+              Text(
+                title.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.manrope(
+                  color: primary,
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.4,
+                ),
+              ),
+            ],
           ),
         ),
 
-        SizedBox(
-          height: 5.h,
-        ),
-
-        Text(
-          label,
-
-          style:
-          GoogleFonts.inter(
-            color:
-            color.withOpacity(
-              .42,
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 10.w,
+            vertical: 8.h,
+          ),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(
+              13.r,
             ),
-            fontSize:
-            7.sp,
-            fontWeight:
-            FontWeight.w800,
-            letterSpacing:
-            1.4,
+            border: Border.all(
+              color: divider,
+            ),
+          ),
+          child: Text(
+            count.toString().padLeft(2, '0'),
+            style: GoogleFonts.manrope(
+              color: primary,
+              fontSize: 8.sp,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ],
@@ -851,301 +525,495 @@ class _MetaItem
   }
 }
 
-// ==================================================================
-// META DIVIDER
-// ==================================================================
+// ============================================================================
+// HERO
+// ============================================================================
 
-class _MetaDivider
-    extends StatelessWidget {
-  final Color color;
-
-  const _MetaDivider({
-    required this.color,
-  });
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return Container(
-      width: 1,
-      height: 26.h,
-      color: color,
-    );
-  }
-}
-
-// ==================================================================
-// CINEMATIC WALLPAPER CARD
-// ==================================================================
-
-class _CinematicWallpaperCard
-    extends StatefulWidget {
-  final String image;
-  final int index;
+class _Hero extends StatelessWidget {
+  final String? image;
   final String title;
-  final double height;
-  final Color accent;
-  final VoidCallback onTap;
+  final int count;
 
-  const _CinematicWallpaperCard({
+  final Color background;
+  final Color surface;
+  final Color primary;
+  final Color secondary;
+  final Color muted;
+  final Color divider;
+  final Color accent;
+
+  final VoidCallback? onTap;
+
+  const _Hero({
     required this.image,
-    required this.index,
     required this.title,
-    required this.height,
+    required this.count,
+    required this.background,
+    required this.surface,
+    required this.primary,
+    required this.secondary,
+    required this.muted,
+    required this.divider,
     required this.accent,
     required this.onTap,
   });
 
   @override
-  State<
-      _CinematicWallpaperCard>
-  createState() =>
-      _CinematicWallpaperCardState();
-}
-
-class _CinematicWallpaperCardState
-    extends State<
-        _CinematicWallpaperCard>
-    with
-        SingleTickerProviderStateMixin {
-  bool pressed = false;
-
-  late final AnimationController
-  _motionController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _motionController =
-    AnimationController(
-      vsync:
-      this,
-
-      duration:
-      const Duration(
-        seconds: 8,
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        14.w,
+        18.h,
+        14.w,
+        24.h,
       ),
-    )..repeat(
-      reverse:
-      true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(
+            30.r,
+          ),
+          child: SizedBox(
+            height: 475.h,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // ==================================================
+                // IMAGE
+                // ==================================================
+
+                if (image != null)
+                  Image.network(
+                    image!,
+                    fit: BoxFit.cover,
+                    cacheWidth: 1000,
+                    filterQuality:
+                    FilterQuality.medium,
+                    gaplessPlayback: true,
+                    errorBuilder: (
+                        context,
+                        error,
+                        stackTrace,
+                        ) {
+                      return Container(
+                        color: surface,
+                        child: Center(
+                          child: Icon(
+                            Icons
+                                .broken_image_outlined,
+                            color: muted,
+                            size: 28.sp,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  Container(
+                    color: surface,
+                  ),
+
+                // ==================================================
+                // OVERLAY
+                // ==================================================
+
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: const [
+                            0,
+                            .42,
+                            .72,
+                            1,
+                          ],
+                          colors: [
+                            background.withOpacity(.12),
+                            background.withOpacity(.02),
+                            background.withOpacity(.20),
+                            background.withOpacity(.96),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ==================================================
+                // TOP
+                // ==================================================
+
+                Positioned(
+                  top: 16.h,
+                  left: 16.w,
+                  right: 16.w,
+                  child: Row(
+                    children: [
+                      _Pill(
+                        text: 'COLLECTION',
+                        background:
+                        surface.withOpacity(.72),
+                        foreground: primary,
+                        border: divider,
+                      ),
+                      const Spacer(),
+                      _Pill(
+                        text: '4K',
+                        background:
+                        surface.withOpacity(.72),
+                        foreground: primary,
+                        border: divider,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ==================================================
+                // SIDE LABEL
+                // ==================================================
+
+                Positioned(
+                  right: 17.w,
+                  top: 78.h,
+                  child: RotatedBox(
+                    quarterTurns: 1,
+                    child: Text(
+                      'FRAME 01',
+                      style: GoogleFonts.manrope(
+                        color:
+                        primary.withOpacity(.42),
+                        fontSize: 6.sp,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ==================================================
+                // BOTTOM
+                // ==================================================
+
+                Positioned(
+                  left: 18.w,
+                  right: 18.w,
+                  bottom: 18.h,
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 6.w,
+                            height: 6.w,
+                            decoration: BoxDecoration(
+                              color: accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            'SELECTED ATMOSPHERE',
+                            style: GoogleFonts.manrope(
+                              color: primary
+                                  .withOpacity(.68),
+                              fontSize: 7.sp,
+                              fontWeight:
+                              FontWeight.w800,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: 6.h),
+
+                      Text(
+                        title.toUpperCase(),
+                        maxLines: 2,
+                        overflow:
+                        TextOverflow.ellipsis,
+                        style: GoogleFonts.bebasNeue(
+                          color: primary,
+                          fontSize: 66.sp,
+                          height: .84,
+                          letterSpacing: .2,
+                        ),
+                      ),
+
+                      SizedBox(height: 11.h),
+
+                      Row(
+                        children: [
+                          Text(
+                            '${count.toString().padLeft(2, '0')} FRAMES',
+                            style: GoogleFonts.manrope(
+                              color: primary
+                                  .withOpacity(.58),
+                              fontSize: 7.sp,
+                              fontWeight:
+                              FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Container(
+                            width: 1,
+                            height: 12.h,
+                            color: primary
+                                .withOpacity(.22),
+                          ),
+                          SizedBox(width: 12.w),
+                          Text(
+                            '4K',
+                            style: GoogleFonts.manrope(
+                              color: primary
+                                  .withOpacity(.58),
+                              fontSize: 7.sp,
+                              fontWeight:
+                              FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: 13.h),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 1,
+                              color: primary
+                                  .withOpacity(.18),
+                            ),
+                          ),
+                          SizedBox(width: 9.w),
+                          Container(
+                            width: 32.w,
+                            height: 32.w,
+                            decoration: BoxDecoration(
+                              color: surface
+                                  .withOpacity(.78),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: divider,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons
+                                  .arrow_outward_rounded,
+                              color: primary,
+                              size: 14.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
+}
+
+// ============================================================================
+// PILL
+// ============================================================================
+
+class _Pill extends StatelessWidget {
+  final String text;
+  final Color background;
+  final Color foreground;
+  final Color border;
+
+  const _Pill({
+    required this.text,
+    required this.background,
+    required this.foreground,
+    required this.border,
+  });
 
   @override
-  void dispose() {
-    _motionController.dispose();
-
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 10.w,
+        vertical: 7.h,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(
+          10.r,
+        ),
+        border: Border.all(
+          color: border,
+        ),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.manrope(
+          color: foreground,
+          fontSize: 6.5.sp,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1,
+        ),
+      ),
+    );
   }
+}
+
+// ============================================================================
+// WALLPAPER CARD
+// ============================================================================
+
+class _WallpaperCard extends StatefulWidget {
+  final String image;
+  final int index;
+  final String title;
+
+  final Color accent;
+  final Color surface;
+  final Color primary;
+  final Color muted;
+  final Color divider;
+
+  final VoidCallback onTap;
+
+  const _WallpaperCard({
+    required this.image,
+    required this.index,
+    required this.title,
+    required this.accent,
+    required this.surface,
+    required this.primary,
+    required this.muted,
+    required this.divider,
+    required this.onTap,
+  });
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
-    final isDark =
-        Theme.of(context).brightness ==
-            Brightness.dark;
+  State<_WallpaperCard> createState() =>
+      _WallpaperCardState();
+}
 
-    final fallback =
-    isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
+class _WallpaperCardState
+    extends State<_WallpaperCard> {
+  bool _pressed = false;
 
-    final muted =
-    isDark
-        ? AppColors.darkMuted
-        : AppColors.lightMuted;
+  static const List<double> _heights = [
+    285,
+    340,
+    250,
+    320,
+    300,
+    350,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final height =
+        _heights[
+        widget.index % _heights.length
+        ].h;
 
     return GestureDetector(
-      onTapDown:
-          (_) {
+      onTapDown: (_) {
         setState(() {
-          pressed = true;
+          _pressed = true;
         });
       },
-
-      onTapCancel:
-          () {
+      onTapCancel: () {
         setState(() {
-          pressed = false;
+          _pressed = false;
         });
       },
-
-      onTapUp:
-          (_) {
+      onTapUp: (_) {
         setState(() {
-          pressed = false;
+          _pressed = false;
         });
 
         widget.onTap();
       },
-
-      child:
-      AnimatedScale(
-        scale:
-        pressed ? .95 : 1,
-
-        duration:
-        const Duration(
-          milliseconds: 180,
+      child: AnimatedScale(
+        scale: _pressed ? .96 : 1,
+        duration: const Duration(
+          milliseconds: 110,
         ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        Hero(
-          tag:
-          widget.image,
-
-          child:
-          ClipRRect(
-            borderRadius:
-            BorderRadius.circular(
-              34.r,
+        curve: Curves.easeOutCubic,
+        child: Hero(
+          tag: widget.image,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(
+              22.r,
             ),
-
-            child:
-            SizedBox(
-              height:
-              widget.height,
-
-              child:
-              Stack(
-                fit:
-                StackFit.expand,
-
+            child: SizedBox(
+              height: height,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
                   // ==================================================
-                  // KEN BURNS IMAGE
+                  // IMAGE
                   // ==================================================
 
-                  AnimatedBuilder(
-                    animation:
-                    _motionController,
-
-                    builder:
-                        (
+                  Image.network(
+                    widget.image,
+                    fit: BoxFit.cover,
+                    cacheWidth: 650,
+                    filterQuality: FilterQuality.low,
+                    gaplessPlayback: true,
+                    errorBuilder: (
                         context,
-                        child,
+                        error,
+                        stackTrace,
                         ) {
-                      final value =
-                          _motionController
-                              .value;
-
-                      final scale =
-                          1.045 +
-                              (value * .045);
-
-                      final dx =
-                          (value - .5) *
-                              7;
-
-                      final dy =
-                          (value - .5) *
-                              5;
-
-                      return Transform
-                          .translate(
-                        offset:
-                        Offset(
-                          dx,
-                          dy,
-                        ),
-
-                        child:
-                        Transform.scale(
-                          scale:
-                          scale,
-
-                          child:
-                          child,
+                      return Container(
+                        color: widget.surface,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons
+                              .broken_image_outlined,
+                          color: widget.muted,
+                          size: 24.sp,
                         ),
                       );
                     },
-
-                    child:
-                    Image.network(
-                      widget.image,
-
-                      fit:
-                      BoxFit.cover,
-
-                      filterQuality:
-                      FilterQuality.high,
-
-                      errorBuilder:
-                          (
-                          context,
-                          error,
-                          stackTrace,
-                          ) {
-                        return Container(
-                          color:
-                          fallback,
-
-                          alignment:
-                          Alignment.center,
-
-                          child:
-                          Icon(
-                            Icons
-                                .broken_image_outlined,
-
-                            color:
-                            muted,
-
-                            size:
-                            28.sp,
-                          ),
-                        );
-                      },
-                    ),
                   ),
 
                   // ==================================================
-                  // BOTTOM CINEMATIC GRADIENT
+                  // OVERLAY
                   // ==================================================
 
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
                             begin:
                             Alignment.topCenter,
-
                             end:
                             Alignment.bottomCenter,
-
-                            stops: [
+                            stops: const [
                               0,
-                              .28,
-                              .62,
+                              .55,
                               1,
                             ],
-
                             colors: [
-                              Color(
-                                0x14000000,
-                              ),
-
-                              Colors
-                                  .transparent,
-
-                              Color(
-                                0x40000000,
-                              ),
-
-                              Color(
-                                0xF0000000,
-                              ),
+                              widget.surface
+                                  .withOpacity(.06),
+                              widget.surface
+                                  .withOpacity(.01),
+                              widget.surface
+                                  .withOpacity(.90),
                             ],
                           ),
                         ),
@@ -1154,290 +1022,121 @@ class _CinematicWallpaperCardState
                   ),
 
                   // ==================================================
-                  // TOP VIGNETTE
+                  // NUMBER
                   // ==================================================
 
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
-                            begin:
-                            Alignment.topCenter,
-
-                            end:
-                            Alignment.center,
-
-                            colors: [
-                              Color(
-                                0x38000000,
-                              ),
-
-                              Colors
-                                  .transparent,
-                            ],
-                          ),
+                  Positioned(
+                    top: 12.h,
+                    left: 12.w,
+                    child: Container(
+                      padding:
+                      EdgeInsets.symmetric(
+                        horizontal: 8.w,
+                        vertical: 6.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.surface
+                            .withOpacity(.70),
+                        borderRadius:
+                        BorderRadius.circular(
+                          10.r,
+                        ),
+                        border: Border.all(
+                          color: widget.divider
+                              .withOpacity(.7),
+                        ),
+                      ),
+                      child: Text(
+                        (widget.index + 1)
+                            .toString()
+                            .padLeft(2, '0'),
+                        style:
+                        GoogleFonts.manrope(
+                          color: widget.primary,
+                          fontSize: 7.sp,
+                          fontWeight:
+                          FontWeight.w800,
+                          letterSpacing: .8,
                         ),
                       ),
                     ),
                   ),
 
                   // ==================================================
-                  // INDEX
+                  // DOT
                   // ==================================================
 
                   Positioned(
                     top: 17.h,
-                    left: 17.w,
+                    right: 17.w,
+                    child: Container(
+                      width: 7.w,
+                      height: 7.w,
+                      decoration: BoxDecoration(
+                        color: widget.accent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
 
-                    child:
-                    Row(
+                  // ==================================================
+                  // BOTTOM
+                  // ==================================================
+
+                  Positioned(
+                    left: 14.w,
+                    right: 14.w,
+                    bottom: 14.h,
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
                       children: [
                         Text(
-                          (widget.index +
-                              1)
-                              .toString()
-                              .padLeft(
-                            2,
-                            '0',
-                          ),
-
-                          style:
-                          GoogleFonts.inter(
-                            color:
-                            Colors.white
-                                .withOpacity(
-                              .72,
-                            ),
-
-                            fontSize:
-                            9.sp,
-
+                          '4K • ${widget.title.toUpperCase()}',
+                          maxLines: 1,
+                          overflow:
+                          TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            color: widget.primary
+                                .withOpacity(.55),
+                            fontSize: 6.5.sp,
                             fontWeight:
                             FontWeight.w800,
-
-                            letterSpacing:
-                            1.8,
+                            letterSpacing: .8,
                           ),
                         ),
 
-                        SizedBox(
-                          width: 8.w,
-                        ),
-
-                        AnimatedContainer(
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            350,
-                          ),
-
-                          width:
-                          pressed
-                              ? 28.w
-                              : 18.w,
-
-                          height: 1,
-
-                          color:
-                          widget.accent
-                              .withOpacity(
-                            pressed
-                                ? .85
-                                : .45,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ==================================================
-                  // TOP RIGHT ACCENT
-                  // ==================================================
-
-                  Positioned(
-                    top: 18.h,
-                    right: 18.w,
-
-                    child:
-                    AnimatedContainer(
-                      duration:
-                      const Duration(
-                        milliseconds: 400,
-                      ),
-
-                      width:
-                      pressed
-                          ? 11.w
-                          : 7.w,
-
-                      height:
-                      pressed
-                          ? 11.w
-                          : 7.w,
-
-                      decoration:
-                      BoxDecoration(
-                        color:
-                        widget.accent,
-
-                        shape:
-                        BoxShape.circle,
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // CONTENT
-                  // ==================================================
-
-                  Positioned(
-                    left: 18.w,
-                    right: 18.w,
-                    bottom: 18.h,
-
-                    child:
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 5.w,
-                              height: 5.w,
-
-                              decoration:
-                              BoxDecoration(
-                                color:
-                                widget.accent,
-                                shape:
-                                BoxShape.circle,
-                              ),
-                            ),
-
-                            SizedBox(
-                              width: 7.w,
-                            ),
-
-                            Expanded(
-                              child:
-                              Text(
-                                '4K • ${widget.title.toUpperCase()}',
-
-                                maxLines: 1,
-
-                                overflow:
-                                TextOverflow
-                                    .ellipsis,
-
-                                style:
-                                GoogleFonts.inter(
-                                  color:
-                                  Colors.white.withOpacity(
-                                    .70,
-                                  ),
-
-                                  fontSize:
-                                  8.sp,
-
-                                  fontWeight:
-                                  FontWeight.w800,
-
-                                  letterSpacing:
-                                  1.2,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(
-                          height: 8.h,
-                        ),
+                        SizedBox(height: 5.h),
 
                         Text(
                           'FRAME ${(widget.index + 1).toString().padLeft(2, '0')}',
-
                           style:
                           GoogleFonts.bebasNeue(
-                            color:
-                            Colors.white,
-
-                            fontSize:
-                            40.sp,
-
-                            height:
-                            .8,
-
-                            letterSpacing:
-                            1.8,
+                            color: widget.primary,
+                            fontSize: 26.sp,
+                            height: .9,
+                            letterSpacing: .2,
                           ),
                         ),
 
-                        SizedBox(
-                          height: 11.h,
-                        ),
+                        SizedBox(height: 8.h),
 
                         Row(
                           children: [
                             Expanded(
-                              child:
-                              AnimatedContainer(
-                                duration:
-                                const Duration(
-                                  milliseconds:
-                                  500,
-                                ),
-
+                              child: Container(
                                 height: 1,
-
-                                color:
-                                widget.accent
-                                    .withOpacity(
-                                  pressed
-                                      ? .75
-                                      : .32,
-                                ),
+                                color: widget.primary
+                                    .withOpacity(.18),
                               ),
                             ),
-
-                            SizedBox(
-                              width: 10.w,
-                            ),
-
-                            AnimatedRotation(
-                              turns:
-                              pressed
-                                  ? .12
-                                  : 0,
-
-                              duration:
-                              const Duration(
-                                milliseconds:
-                                300,
-                              ),
-
-                              child:
-                              Icon(
-                                Icons
-                                    .arrow_outward_rounded,
-
-                                color:
-                                Colors.white
-                                    .withOpacity(
-                                  .78,
-                                ),
-
-                                size:
-                                15.sp,
-                              ),
+                            SizedBox(width: 8.w),
+                            Icon(
+                              Icons
+                                  .arrow_outward_rounded,
+                              color: widget.primary
+                                  .withOpacity(.65),
+                              size: 13.sp,
                             ),
                           ],
                         ),
@@ -1450,227 +1149,154 @@ class _CinematicWallpaperCardState
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      Duration(
-        milliseconds:
-        widget.index * 100,
-      ),
+    );
+  }
+}
 
-      duration:
-      const Duration(
-        milliseconds: 900,
-      ),
-    )
-        .moveY(
-      begin: 90,
-      end: 0,
+// ============================================================================
+// CIRCLE BUTTON
+// ============================================================================
 
-      delay:
-      Duration(
-        milliseconds:
-        widget.index * 100,
-      ),
+class _CircleButton extends StatelessWidget {
+  final IconData icon;
 
-      duration:
-      const Duration(
-        milliseconds: 950,
-      ),
+  final Color background;
+  final Color border;
+  final Color foreground;
 
-      curve:
-      Curves.easeOutExpo,
-    )
-        .scale(
-      begin:
-      const Offset(
-        .90,
-        .90,
-      ),
+  final VoidCallback onTap;
 
-      end:
-      const Offset(
-        1,
-        1,
-      ),
+  const _CircleButton({
+    required this.icon,
+    required this.background,
+    required this.border,
+    required this.foreground,
+    required this.onTap,
+  });
 
-      duration:
-      const Duration(
-        milliseconds: 950,
-      ),
-
-      curve:
-      Curves.easeOutExpo,
-    )
-        .blurXY(
-      begin: 4,
-      end: 0,
-
-      duration:
-      const Duration(
-        milliseconds: 800,
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(
+          16.r,
+        ),
+        child: Ink(
+          width: 46.w,
+          height: 46.w,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(
+              16.r,
+            ),
+            border: Border.all(
+              color: border,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: foreground,
+            size: 15.sp,
+          ),
+        ),
       ),
     );
   }
 }
 
-// ==================================================================
+// ============================================================================
 // EMPTY STATE
-// ==================================================================
+// ============================================================================
 
-class _EmptyState
-    extends StatelessWidget {
-  final Color text;
+class _EmptyState extends StatelessWidget {
+  final Color primary;
   final Color secondary;
   final Color accent;
 
   const _EmptyState({
-    required this.text,
+    required this.primary,
     required this.secondary,
     required this.accent,
   });
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
+  Widget build(BuildContext context) {
     return Center(
-      child:
-      Column(
+      child: Column(
         mainAxisAlignment:
         MainAxisAlignment.center,
-
         children: [
-          SizedBox(
-            width: 110.w,
-            height: 110.w,
-
-            child:
-            Stack(
-              alignment:
-              Alignment.center,
-
-              children: [
-                Container(
-                  width: 110.w,
-                  height: 110.w,
-
-                  decoration:
-                  BoxDecoration(
-                    shape:
-                    BoxShape.circle,
-
-                    color:
-                    accent.withOpacity(
-                      .035,
-                    ),
-
-                    border:
-                    Border.all(
-                      color:
-                      accent.withOpacity(
-                        .14,
-                      ),
-                    ),
-                  ),
-                ),
-
-                Icon(
-                  Icons
-                      .wallpaper_rounded,
-
-                  color:
-                  accent.withOpacity(
-                    .55,
-                  ),
-
-                  size:
-                  42.sp,
-                ),
-              ],
+          Container(
+            width: 60.w,
+            height: 60.w,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(.08),
+              shape: BoxShape.circle,
             ),
-          )
-              .animate(
-            onPlay:
-                (controller) =>
-                controller.repeat(
-                  reverse: true,
-                ),
-          )
-              .scale(
-            begin:
-            const Offset(
-              .94,
-              .94,
+            child: Icon(
+              Icons.image_not_supported_outlined,
+              color: accent,
+              size: 25.sp,
             ),
-
-            end:
-            const Offset(
-              1.04,
-              1.04,
-            ),
-
-            duration:
-            const Duration(
-              milliseconds: 1800,
-            ),
-
-            curve:
-            Curves.easeInOut,
           ),
-
-          SizedBox(
-            height: 28.h,
-          ),
-
+          SizedBox(height: 15.h),
           Text(
-            'NO WALLPAPERS',
-
-            style:
-            GoogleFonts.bebasNeue(
-              color:
-              text,
-
-              fontSize:
-              34.sp,
-
-              letterSpacing:
-              2,
+            'EMPTY COLLECTION',
+            style: GoogleFonts.bebasNeue(
+              color: primary,
+              fontSize: 25.sp,
             ),
           ),
-
-          SizedBox(
-            height: 10.h,
-          ),
-
+          SizedBox(height: 4.h),
           Text(
-            'New wallpapers will appear here soon.',
-
-            style:
-            GoogleFonts.inter(
-              color:
-              secondary,
-
-              fontSize:
-              13.sp,
+            'Nothing here yet.',
+            style: GoogleFonts.manrope(
+              color: secondary,
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds: 800,
-      ),
-    )
-        .moveY(
-      begin: 30,
-      end: 0,
-      curve:
-      Curves.easeOutExpo,
+    );
+  }
+}
+
+// ============================================================================
+// END
+// ============================================================================
+
+class _EndMark extends StatelessWidget {
+  final Color divider;
+  final Color muted;
+
+  const _EndMark({
+    required this.divider,
+    required this.muted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 30.w,
+          height: 1,
+          color: divider,
+        ),
+        SizedBox(height: 10.h),
+        Text(
+          'END',
+          style: GoogleFonts.manrope(
+            color: muted.withOpacity(.35),
+            fontSize: 6.sp,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 2,
+          ),
+        ),
+      ],
     );
   }
 }

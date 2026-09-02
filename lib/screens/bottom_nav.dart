@@ -22,205 +22,195 @@ class MainScreen extends StatefulWidget {
   });
 
   @override
-  State<MainScreen> createState() =>
-      _MainScreenState();
+  State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState
-    extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> {
+  // ===========================================================================
+  // TAB
+  // ===========================================================================
+  //
+  // 0 = Home
+  // 1 = Categories
+  // 2 = Saved
+  // 3 = Recent
+  // 4 = Settings
+  //
+  // There are exactly 5 pages in IndexedStack.
+  // ===========================================================================
+
   int currentTab = 0;
 
   late List<Wallpaper> recentWallpapers;
+
+  // ===========================================================================
+  // INIT
+  // ===========================================================================
 
   @override
   void initState() {
     super.initState();
 
-    recentWallpapers =
-    List<Wallpaper>.from(
+    recentWallpapers = List<Wallpaper>.from(
       widget.recentWallpapers,
     );
   }
 
-  // ============================================================
-  // APP COLORS
-  // ============================================================
+  // ===========================================================================
+  // THEME
+  // ===========================================================================
 
   bool get isDark =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+      Theme.of(context).brightness == Brightness.dark;
 
-  Color get background =>
-      isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground;
+  Color get background => isDark
+      ? AppColors.darkBackground
+      : AppColors.lightBackground;
 
-  Color get surface =>
-      isDark
-          ? AppColors.darkSurface
-          : AppColors.lightSurface;
+  Color get surface => isDark
+      ? AppColors.darkSurface
+      : AppColors.lightSurface;
 
-  Color get surfaceSoft =>
-      isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
+  Color get surfaceSoft => isDark
+      ? AppColors.darkSurfaceSoft
+      : AppColors.lightSurfaceSoft;
 
-  Color get primary =>
-      isDark
-          ? AppColors.darkPrimary
-          : AppColors.lightPrimary;
+  Color get primary => isDark
+      ? AppColors.darkPrimary
+      : AppColors.lightPrimary;
 
-  Color get secondary =>
-      isDark
-          ? AppColors.darkSecondary
-          : AppColors.lightSecondary;
+  Color get secondary => isDark
+      ? AppColors.darkSecondary
+      : AppColors.lightSecondary;
 
-  Color get divider =>
-      isDark
-          ? AppColors.darkDivider
-          : AppColors.lightDivider;
+  Color get divider => isDark
+      ? AppColors.darkDivider
+      : AppColors.lightDivider;
 
-  Color get accent =>
-      AppColors.accent;
+  Color get accent => AppColors.accent;
 
-  // ============================================================
+  // ===========================================================================
   // PAGES
-  // ============================================================
+  // ===========================================================================
 
-  Widget _buildPage(
-      int index,
-      ) {
+  Widget _buildPage(int index) {
     switch (index) {
+    // =======================================================================
+    // HOME
+    // =======================================================================
+
       case 0:
         return const HomeScreen();
+
+    // =======================================================================
+    // CATEGORIES
+    // =======================================================================
 
       case 1:
         return const CategoriesPage();
 
+    // =======================================================================
+    // SAVED
+    // =======================================================================
+
       case 2:
         return const SavedScreen();
 
+    // =======================================================================
+    // RECENT
+    // =======================================================================
+
       case 3:
-        return RecentPage(
-          key: ValueKey(
-            recentWallpapers
-                .map(
-                  (wallpaper) =>
-              wallpaper.id,
-            )
-                .join('|'),
-          ),
-          recentWallpapers:
-          recentWallpapers,
+        return DesktopPage(
         );
+
+    // =======================================================================
+    // SETTINGS
+    // =======================================================================
 
       case 4:
         return const PreferencesScreen();
+
+    // =======================================================================
+    // FALLBACK
+    // =======================================================================
 
       default:
         return const HomeScreen();
     }
   }
 
-  // ============================================================
+  // ===========================================================================
   // TAB CHANGE
-  // ============================================================
+  // ===========================================================================
 
-  void _changeTab(
-      int index,
-      ) {
-    if (currentTab ==
-        index) {
+  void _changeTab(int index) {
+    // Never allow an invalid IndexedStack index.
+    if (index < 0 || index > 4) {
+      return;
+    }
+
+    if (currentTab == index) {
       return;
     }
 
     HapticFeedback.selectionClick();
 
     setState(() {
-      currentTab =
-          index;
+      currentTab = index;
     });
   }
 
-  // ============================================================
+  // ===========================================================================
   // TOOLBAR COLORS
-  // ============================================================
+  // ===========================================================================
 
-  M3EFloatingToolbarColors
-  get _toolbarColors {
+  M3EFloatingToolbarColors get _toolbarColors {
     return M3EFloatingToolbarColors(
-      toolbarContainerColor:
-      surface,
-
-      toolbarContentColor:
-      primary,
-
-      fabContainerColor:
-      accent,
-
-      fabContentColor:
-      primary,
+      toolbarContainerColor: surface,
+      toolbarContentColor: primary,
+      fabContainerColor: accent,
+      fabContentColor: primary,
     );
   }
 
-  // ============================================================
-  // DECORATION
-  // ============================================================
+  // ===========================================================================
+  // TOOLBAR DECORATION
+  // ===========================================================================
 
-  M3EFloatingToolbarDecoration
-  get _toolbarDecoration {
+  M3EFloatingToolbarDecoration get _toolbarDecoration {
     return M3EFloatingToolbarDecoration(
-      colors:
-      _toolbarColors,
+      colors: _toolbarColors,
 
-      shape:
-      RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.circular(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
           26.r,
         ),
-
-        side:
-        BorderSide(
-          color:
-          divider,
-
-          width:
-          1,
+        side: BorderSide(
+          color: divider,
+          width: 1,
         ),
       ),
 
-      contentPadding:
-      EdgeInsets.symmetric(
-        horizontal:
-        7.w,
-
-        vertical:
-        6.h,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 7.w,
+        vertical: 6.h,
       ),
 
-      // Cinematic but controlled.
-      motion:
-      M3EMotion.custom(
-        stiffness:
-        700,
-
-        damping:
-        0.82,
+      motion: M3EMotion.custom(
+        stiffness: 700,
+        damping: .82,
       ),
 
-      // NO SHADOW.
-      expandedShadowElevation:
-      0,
-
-      collapsedShadowElevation:
-      0,
+      // No shadow.
+      expandedShadowElevation: 0,
+      collapsedShadowElevation: 0,
     );
   }
 
-  // ============================================================
+  // ===========================================================================
   // NAVIGATION ITEM
-  // ============================================================
+  // ===========================================================================
 
   Widget _navigationItem({
     required int index,
@@ -228,161 +218,116 @@ class _MainScreenState
     required IconData activeIcon,
     required String label,
   }) {
-    final selected =
-        currentTab ==
-            index;
+    final bool selected = currentTab == index;
 
     return GestureDetector(
-      behavior:
-      HitTestBehavior.opaque,
+      behavior: HitTestBehavior.opaque,
 
-      onTap:
-          () {
-        _changeTab(
-          index,
-        );
+      onTap: () {
+        _changeTab(index);
       },
 
-      child:
-      AnimatedContainer(
-        duration:
-        const Duration(
-          milliseconds:
-          380,
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 320,
         ),
 
-        curve:
-        Curves.easeOutCubic,
+        curve: Curves.easeOutCubic,
 
-        padding:
-        EdgeInsets.symmetric(
-          horizontal:
-          selected
-              ? 13.w
-              : 12.w,
-
-          vertical:
-          7.h,
+        padding: EdgeInsets.symmetric(
+          horizontal: selected ? 13.w : 12.w,
+          vertical: 7.h,
         ),
 
-        decoration:
-        BoxDecoration(
-          color:
-          selected
+        decoration: BoxDecoration(
+          color: selected
               ? accent.withOpacity(
-            isDark
-                ? .14
-                : .10,
+            isDark ? .14 : .10,
           )
               : Colors.transparent,
 
-          borderRadius:
-          BorderRadius.circular(
+          borderRadius: BorderRadius.circular(
             20.r,
           ),
 
-          border:
-          Border.all(
-            color:
-            selected
+          border: Border.all(
+            color: selected
                 ? accent.withOpacity(
-              isDark
-                  ? .22
-                  : .18,
+              isDark ? .22 : .18,
             )
                 : Colors.transparent,
           ),
         ),
 
-        child:
-        AnimatedSize(
-          duration:
-          const Duration(
-            milliseconds:
-            320,
+        child: AnimatedSize(
+          duration: const Duration(
+            milliseconds: 300,
           ),
 
-          curve:
-          Curves.easeOutCubic,
+          curve: Curves.easeOutCubic,
 
-          child:
-          Row(
-            mainAxisSize:
-            MainAxisSize.min,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
 
             children: [
+              // ===============================================================
+              // ICON
+              // ===============================================================
+
               AnimatedSwitcher(
-                duration:
-                const Duration(
-                  milliseconds:
-                  240,
+                duration: const Duration(
+                  milliseconds: 220,
                 ),
 
-                transitionBuilder:
-                    (
+                transitionBuilder: (
                     child,
                     animation,
                     ) {
                   return ScaleTransition(
-                    scale:
-                    animation,
-
-                    child:
-                    FadeTransition(
-                      opacity:
-                      animation,
-
-                      child:
-                      child,
+                    scale: animation,
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
                     ),
                   );
                 },
 
-                child:
-                Icon(
+                child: Icon(
                   selected
                       ? activeIcon
                       : icon,
 
-                  key:
-                  ValueKey(
+                  key: ValueKey(
                     selected,
                   ),
 
-                  size:
-                  selected
+                  size: selected
                       ? 20.sp
                       : 19.sp,
 
-                  color:
-                  selected
+                  color: selected
                       ? primary
                       : secondary,
                 ),
               ),
 
+              // ===============================================================
+              // LABEL
+              // ===============================================================
+
               if (selected) ...[
                 SizedBox(
-                  width:
-                  7.w,
+                  width: 7.w,
                 ),
 
                 Text(
                   label,
 
-                  style:
-                  TextStyle(
-                    color:
-                    primary,
-
-                    fontSize:
-                    9.sp,
-
-                    fontWeight:
-                    FontWeight.w700,
-
-                    letterSpacing:
-                    .1,
+                  style: TextStyle(
+                    color: primary,
+                    fontSize: 9.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .1,
                   ),
                 ),
               ],
@@ -393,191 +338,154 @@ class _MainScreenState
     );
   }
 
-  // ============================================================
+  // ===========================================================================
   // NAVIGATION CONTENT
-  // ============================================================
+  // ===========================================================================
 
   Widget _navigationContent() {
     return Row(
-      mainAxisSize:
-      MainAxisSize.min,
+      mainAxisSize: MainAxisSize.min,
 
       children: [
+        // =====================================================================
+        // HOME
+        // =====================================================================
+
         _navigationItem(
-          index:
-          0,
-
-          icon:
-          Hicons
-              .home2LightOutline,
-
-          activeIcon:
-          Hicons
-              .home2Bold,
-
-          label:
-          'Home',
+          index: 0,
+          icon: Hicons.discovery2LightOutline,
+          activeIcon: Hicons.discovery2Bold,
+          label: 'Discover',
         ),
 
         SizedBox(
-          width:
-          2.w,
+          width: 2.w,
         ),
 
+        // =====================================================================
+        // CATEGORIES
+        // =====================================================================
+
         _navigationItem(
-          index:
-          1,
-
-          icon:
-          Hicons
-              .categoryLightOutline,
-
-          activeIcon:
-          Hicons
-              .categoryBold,
-
-          label:
-          'Explore',
+          index: 1,
+          icon: Hicons.categoryLightOutline,
+          activeIcon: Hicons.categoryBold,
+          label: 'Explore',
         ),
 
         SizedBox(
-          width:
-          2.w,
+          width: 2.w,
         ),
 
+        // =====================================================================
+        // SAVED
+        // =====================================================================
+
         _navigationItem(
-          index:
-          2,
-
-          icon:
-          Hicons
-              .heart2LightOutline,
-
-          activeIcon:
-          Hicons
-              .heart2Bold,
-
-          label:
-          'Saved',
+          index: 2,
+          icon: Hicons.heart2LightOutline,
+          activeIcon: Hicons.heart2Bold,
+          label: 'Saved',
         ),
 
         SizedBox(
-          width:
-          2.w,
+          width: 2.w,
         ),
 
+        // =====================================================================
+        // RECENT
+        // =====================================================================
+
         _navigationItem(
-          index:
-          3,
-
-          icon:
-          Hicons
-              .rotateLeftLightOutline,
-
-          activeIcon:
-          Hicons
-              .rotateLeftBold,
-
-          label:
-          'Recent',
+          index: 3,
+          icon: Hicons.display4LightOutline,
+          activeIcon: Hicons.display4Bold,
+          label: 'Desktop',
         ),
 
         SizedBox(
-          width:
-          2.w,
+          width: 2.w,
         ),
+
+        // =====================================================================
+        // SETTINGS
+        // =====================================================================
 
         _navigationItem(
           index: 4,
-
-          icon:
-          Hicons
-              .settingLightOutline,
-
-          activeIcon:
-          Hicons
-              .settingBold,
-
-          label:
-          'Settings',
+          icon: Hicons.settingLightOutline,
+          activeIcon: Hicons.settingBold,
+          label: 'Settings',
         ),
       ],
     );
   }
 
-  // ============================================================
+  // ===========================================================================
   // BUILD
-  // ============================================================
+  // ===========================================================================
 
   @override
   Widget build(
       BuildContext context,
       ) {
     return Scaffold(
-      backgroundColor:
-      background,
+      backgroundColor: background,
 
-      extendBody:
-      true,
+      extendBody: true,
 
-      body:
-      Stack(
+      body: Stack(
         children: [
-          // ======================================================
-          // APP CONTENT
-          // ======================================================
+          // ====================================================================
+          // MAIN CONTENT
+          // ====================================================================
 
           Positioned.fill(
-            child:
-            IndexedStack(
-              index:
-              currentTab,
+            child: IndexedStack(
+              index: currentTab,
 
-              children:
-              List.generate(
-                5,
-                _buildPage,
-              ),
+              children: [
+                // 0
+                _buildPage(0),
+
+                // 1
+                _buildPage(1),
+
+                // 2
+                _buildPage(2),
+
+                // 3
+                _buildPage(3),
+
+                // 4
+                _buildPage(4),
+              ],
             ),
           ),
 
-          // ======================================================
-          // FLOATING EXPRESSIVE NAVIGATION
-          // ======================================================
+          // ====================================================================
+          // FLOATING NAVIGATION
+          // ====================================================================
 
           Positioned(
-            left:
-            14.w,
+            left: 14.w,
+            right: 14.w,
+            bottom: 14.h,
 
-            right:
-            14.w,
+            child: SafeArea(
+              top: false,
 
-            bottom:
-            14.h,
+              child: Align(
+                alignment: Alignment.bottomCenter,
 
-            child:
-            SafeArea(
-              top:
-              false,
+                child: M3EHorizontalFloatingToolbar(
+                  expanded: true,
 
-              child:
-              Align(
-                alignment:
-                Alignment.bottomCenter,
+                  decoration: _toolbarDecoration,
 
-                child:
-                M3EHorizontalFloatingToolbar(
-                  expanded:
-                  true,
+                  content: _navigationContent(),
 
-                  decoration:
-                  _toolbarDecoration,
-
-                  content:
-                  _navigationContent(),
-
-                  tooltip:
-                  'Navigation',
+                  tooltip: 'Navigation',
                 ),
               ),
             ),

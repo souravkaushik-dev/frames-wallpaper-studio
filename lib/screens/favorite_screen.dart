@@ -2,7 +2,6 @@ import 'package:dotty/constants/app_colors.dart';
 import 'package:dotty/screens/previewscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,255 +12,332 @@ class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
 
   @override
-  State<SavedScreen> createState() =>
-      _SavedScreenState();
+  State<SavedScreen> createState() => _SavedScreenState();
 }
 
-class _SavedScreenState
-    extends State<SavedScreen> {
-  // ============================================================
-  // DATA
-  // ============================================================
+class _SavedScreenState extends State<SavedScreen>
+    with SingleTickerProviderStateMixin {
+  late Future<List<Map<String, dynamic>>> _favoritesFuture;
 
-  Future<List<Map<String, dynamic>>>
-  fetchFavorites() {
-    return FavoritesService
-        .getFavorites();
+  late final AnimationController _introController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _favoritesFuture = FavoritesService.getFavorites();
+
+    _introController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _introController.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _introController.dispose();
+    super.dispose();
   }
 
   // ============================================================
   // THEME
   // ============================================================
 
-  bool get _isDark =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   Color get _background =>
-      _isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground;
+      _isDark ? AppColors.darkBackground : AppColors.lightBackground;
 
   Color get _surface =>
-      _isDark
-          ? AppColors.darkSurface
-          : AppColors.lightSurface;
+      _isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
   Color get _surfaceSoft =>
-      _isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
+      _isDark ? AppColors.darkSurfaceSoft : AppColors.lightSurfaceSoft;
 
   Color get _primary =>
-      _isDark
-          ? AppColors.darkPrimary
-          : AppColors.lightPrimary;
+      _isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
 
   Color get _secondary =>
-      _isDark
-          ? AppColors.darkSecondary
-          : AppColors.lightSecondary;
+      _isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
 
-  Color get _muted =>
-      _isDark
-          ? AppColors.darkMuted
-          : AppColors.lightMuted;
+  Color get _muted => _isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
   Color get _divider =>
-      _isDark
-          ? AppColors.darkDivider
-          : AppColors.lightDivider;
+      _isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
-  Color get _accent =>
-      AppColors.accent;
+  Color get _accent => AppColors.accent;
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  Future<void> _refresh() async {
+    HapticFeedback.selectionClick();
+
+    final future = FavoritesService.getFavorites();
+
+    setState(() {
+      _favoritesFuture = future;
+    });
+
+    await future;
+
+    if (mounted) {
+      _introController
+        ..reset()
+        ..forward();
+    }
+  }
+
+  void _retry() {
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _favoritesFuture = FavoritesService.getFavorites();
+    });
+  }
+
+  // ============================================================
+  // PREVIEW
+  // ============================================================
+
+  void _openPreview(String image, String category) {
+    if (image.isEmpty) return;
+
+    HapticFeedback.selectionClick();
+
+    // Warm the exact same NetworkImage used by the card. This means the
+    // preview can reuse Flutter's image cache instead of starting a second
+    // network decode when the user taps. We intentionally do NOT await this
+    // call: navigation must happen immediately.
+    final imageProvider = NetworkImage(image);
+    precacheImage(imageProvider, context);
+
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 1),
+        reverseTransitionDuration: const Duration(milliseconds: 1),
+        pageBuilder: (_, animation, __) {
+          // The card and destination use the same Hero tag. The destination
+          // Hero wraps the existing PreviewScreen so the already-visible
+          // wallpaper can travel directly into the preview instead of
+          // disappearing during a fade/scale route animation.
+          return Hero(
+            tag: image,
+            flightShuttleBuilder:
+                (
+                  flightContext,
+                  animation,
+                  flightDirection,
+                  fromHeroContext,
+                  toHeroContext,
+                ) {
+                  return Material(
+                    color: Colors.transparent,
+                    child: toHeroContext.widget,
+                  );
+                },
+            child: PreviewScreen(imageUrl: image, category: category),
+          );
+        },
+        transitionsBuilder: (_, animation, __, child) {
+          // No fade/scale delay. Hero handles the visual movement.
+          return child;
+        },
+      ),
+    );
+  }
 
   // ============================================================
   // BUILD
   // ============================================================
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-      _background,
-
-      body:
-      FutureBuilder<
-          List<Map<String, dynamic>>>(
-        future:
-        fetchFavorites(),
-
-        builder:
-            (
-            context,
-            snapshot,
-            ) {
-          // ========================================================
-          // LOADING
-          // ========================================================
-
-          if (snapshot
-              .connectionState ==
-              ConnectionState
-                  .waiting) {
-            return _buildLoading();
+      backgroundColor: _background,
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _favoritesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return _LoadingState(background: _background, accent: _accent);
           }
 
-          // ========================================================
-          // ERROR
-          // ========================================================
-
-          if (snapshot.hasError) {
-            return _buildError();
+          if (snapshot.hasError && !snapshot.hasData) {
+            return _ErrorState(
+              background: _background,
+              primary: _primary,
+              secondary: _secondary,
+              accent: _accent,
+              onRetry: _retry,
+            );
           }
 
-          final favorites =
-              snapshot.data ?? [];
-
-          // ========================================================
-          // EMPTY
-          // ========================================================
+          final favorites = snapshot.data ?? const [];
 
           if (favorites.isEmpty) {
-            return _buildEmptyState();
+            return _EmptyState(
+              background: _background,
+              primary: _primary,
+              secondary: _secondary,
+              accent: _accent,
+            );
           }
 
-          // ========================================================
-          // MAIN
-          // ========================================================
-
           return RefreshIndicator(
-            color:
-            _accent,
-
-            backgroundColor:
-            _surface,
-
-            displacement:
-            70.h,
-
-            strokeWidth:
-            1.8,
-
-            onRefresh:
-                () async {
-              HapticFeedback
-                  .selectionClick();
-
-              setState(() {});
-
-              await fetchFavorites();
-            },
-
-            child:
-            CustomScrollView(
-              physics:
-              const BouncingScrollPhysics(
-                parent:
-                AlwaysScrollableScrollPhysics(),
+            color: _accent,
+            backgroundColor: _surface,
+            displacement: 60.h,
+            strokeWidth: 1.5,
+            onRefresh: _refresh,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
               ),
-
+              cacheExtent: 800,
               slivers: [
                 // ==================================================
-                // HERO
+                // HEADER
                 // ==================================================
 
                 SliverToBoxAdapter(
-                  child:
-                  _buildHero(
-                    count:
-                    favorites.length,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
+                      child: _SavedHeader(
+                        count: favorites.length,
+                        surface: _surface,
+                        surfaceSoft: _surfaceSoft,
+                        divider: _divider,
+                        primary: _primary,
+                        secondary: _secondary,
+                        accent: _accent,
+                      ),
+                    ),
                   ),
                 ),
 
                 // ==================================================
-                // SECTION HEADER
+                // HERO
                 // ==================================================
-
                 SliverToBoxAdapter(
-                  child:
-                  _buildArchiveHeader(
-                    count:
-                    favorites.length,
+                  child: _IntroAnimation(
+                    controller: _introController,
+                    child: _SavedHero(
+                      item: favorites.first,
+                      count: favorites.length,
+                      background: _background,
+                      surface: _surface,
+                      primary: _primary,
+                      secondary: _secondary,
+                      muted: _muted,
+                      divider: _divider,
+                      accent: _accent,
+                      onTap: () {
+                        final image =
+                            favorites.first['imageUrl']?.toString() ?? '';
+
+                        final category =
+                            favorites.first['category']?.toString() ?? 'Saved';
+
+                        _openPreview(image, category);
+                      },
+                    ),
+                  ),
+                ),
+
+                // ==================================================
+                // COLLECTION LABEL
+                // ==================================================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 14.h),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'SAVED',
+                          style: GoogleFonts.bebasNeue(
+                            color: _primary,
+                            fontSize: 29.sp,
+                            height: .9,
+                            letterSpacing: .3,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 6.w,
+                          height: 6.w,
+                          decoration: BoxDecoration(
+                            color: _accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 7.w),
+                        Text(
+                          favorites.length.toString().padLeft(2, '0'),
+                          style: GoogleFonts.manrope(
+                            color: _muted,
+                            fontSize: 8.sp,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
                 // ==================================================
                 // GRID
                 // ==================================================
-
                 SliverPadding(
-                  padding:
-                  EdgeInsets.symmetric(
-                    horizontal:
-                    18.w,
-                  ),
+                  padding: EdgeInsets.fromLTRB(14.w, 0, 14.w, 70.h),
+                  sliver: SliverMasonryGrid.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10.h,
+                    crossAxisSpacing: 10.w,
+                    childCount: favorites.length,
+                    itemBuilder: (context, index) {
+                      final item = favorites[index];
 
-                  sliver:
-                  SliverMasonryGrid.count(
-                    crossAxisCount:
-                    2,
+                      final image = item['imageUrl']?.toString() ?? '';
 
-                    mainAxisSpacing:
-                    14.h,
+                      final category = item['category']?.toString() ?? 'Saved';
 
-                    crossAxisSpacing:
-                    14.w,
-
-                    childCount:
-                    favorites.length,
-
-                    itemBuilder:
-                        (
-                        context,
-                        index,
-                        ) {
-                      final item =
-                      favorites[index];
-
-                      final String image =
-                          item['imageUrl']
-                              ?.toString() ??
-                              '';
-
-                      final String
-                      category =
-                          item['category']
-                              ?.toString() ??
-                              'Saved';
-
-                      final heights = [
-                        360.h,
-                        280.h,
-                        410.h,
-                        315.h,
+                      const heights = [
+                        320.0,
+                        275.0,
+                        360.0,
+                        300.0,
+                        340.0,
+                        285.0,
                       ];
 
-                      return _SavedWallpaperCard(
-                        index:
-                        index,
-
-                        image:
-                        image,
-
-                        category:
-                        category,
-
-                        height:
-                        heights[
-                        index %
-                            4],
-
-                        onTap:
-                            () {
-                          _openPreview(
-                            context,
-                            image,
-                            category,
-                          );
-                        },
+                      return RepaintBoundary(
+                        key: ValueKey('$image-$category-$index'),
+                        child: _SavedWallpaperCard(
+                          image: image,
+                          category: category,
+                          index: index,
+                          height: heights[index % heights.length].h,
+                          accent: _accent,
+                          surface: _surface,
+                          primary: _primary,
+                          muted: _muted,
+                          divider: _divider,
+                          onTap: () {
+                            _openPreview(image, category);
+                          },
+                        ),
                       );
                     },
                   ),
@@ -270,1164 +346,143 @@ class _SavedScreenState
                 // ==================================================
                 // END
                 // ==================================================
-
                 SliverToBoxAdapter(
-                  child:
-                  _buildEndArchive(),
+                  child: _EndMark(divider: _divider, muted: _muted),
                 ),
               ],
             ),
           );
         },
       ),
-    );
-  }
-
-  // ============================================================
-  // PREVIEW NAVIGATION
-  // ============================================================
-
-  void _openPreview(
-      BuildContext context,
-      String image,
-      String category,
-      ) {
-    if (image.isEmpty) return;
-
-    HapticFeedback
-        .selectionClick();
-
-    Navigator.push(
-      context,
-
-      PageRouteBuilder(
-        transitionDuration:
-        const Duration(
-          milliseconds:
-          700,
-        ),
-
-        reverseTransitionDuration:
-        const Duration(
-          milliseconds:
-          450,
-        ),
-
-        pageBuilder:
-            (
-            _,
-            animation,
-            __,
-            ) {
-          return PreviewScreen(
-            imageUrl:
-            image,
-            category:
-            category,
-          );
-        },
-
-        transitionsBuilder:
-            (
-            _,
-            animation,
-            __,
-            child,
-            ) {
-          final curved =
-          CurvedAnimation(
-            parent:
-            animation,
-            curve:
-            Curves.easeOutExpo,
-          );
-
-          return FadeTransition(
-            opacity:
-            curved,
-
-            child:
-            ScaleTransition(
-              scale:
-              Tween<double>(
-                begin:
-                .94,
-                end:
-                1,
-              ).animate(
-                curved,
-              ),
-
-              child:
-              child,
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ============================================================
-  // HERO
-  // ============================================================
-
-  Widget _buildHero({
-    required int count,
-  }) {
-    return Padding(
-      padding:
-      EdgeInsets.fromLTRB(
-        22.w,
-        82.h,
-        22.w,
-        28.h,
-      ),
-
-      child:
-      Column(
-        crossAxisAlignment:
-        CrossAxisAlignment
-            .start,
-
-        children: [
-          // ------------------------------------------------------
-          // LABEL
-          // ------------------------------------------------------
-
-          Row(
-            children: [
-              Container(
-                width:
-                7.w,
-                height:
-                7.w,
-
-                decoration:
-                BoxDecoration(
-                  color:
-                  _accent,
-                  shape:
-                  BoxShape
-                      .circle,
-                ),
-              ),
-
-              SizedBox(
-                width:
-                9.w,
-              ),
-
-              Text(
-                'FRAME / PERSONAL ARCHIVE',
-
-                style:
-                GoogleFonts.inter(
-                  color:
-                  _secondary,
-                  fontSize:
-                  9.sp,
-                  fontWeight:
-                  FontWeight.w800,
-                  letterSpacing:
-                  2.2,
-                ),
-              ),
-            ],
-          )
-              .animate()
-              .fadeIn(
-            duration:
-            const Duration(
-              milliseconds:
-              500,
-            ),
-          )
-              .moveX(
-            begin:
-            -20,
-            end:
-            0,
-            curve:
-            Curves.easeOutExpo,
-          ),
-
-          SizedBox(
-            height:
-            12.h,
-          ),
-
-          // ------------------------------------------------------
-          // TITLE
-          // ------------------------------------------------------
-
-          Text(
-            'SAVED',
-
-            style:
-            GoogleFonts.bebasNeue(
-              color:
-              _primary,
-              fontSize:
-              94.sp,
-              height:
-              .75,
-              letterSpacing:
-              3,
-            ),
-          )
-              .animate()
-              .fadeIn(
-            duration:
-            const Duration(
-              milliseconds:
-              900,
-            ),
-          )
-              .moveY(
-            begin:
-            80,
-            end:
-            0,
-            duration:
-            const Duration(
-              milliseconds:
-              950,
-            ),
-            curve:
-            Curves.easeOutExpo,
-          )
-              .scale(
-            begin:
-            const Offset(
-              .92,
-              .92,
-            ),
-            end:
-            const Offset(
-              1,
-              1,
-            ),
-            duration:
-            const Duration(
-              milliseconds:
-              950,
-            ),
-            curve:
-            Curves.easeOutExpo,
-          ),
-
-          SizedBox(
-            height:
-            18.h,
-          ),
-
-          // ------------------------------------------------------
-          // DESCRIPTION
-          // ------------------------------------------------------
-
-          SizedBox(
-            width:
-            335.w,
-
-            child:
-            Text(
-              'A personal archive of wallpapers that captured your attention, mood and aesthetic.',
-
-              style:
-              GoogleFonts.inter(
-                color:
-                _secondary,
-                fontSize:
-                13.sp,
-                height:
-                1.65,
-                fontWeight:
-                FontWeight.w500,
-              ),
-            ),
-          )
-              .animate()
-              .fadeIn(
-            delay:
-            const Duration(
-              milliseconds:
-              250,
-            ),
-            duration:
-            const Duration(
-              milliseconds:
-              700,
-            ),
-          )
-              .moveY(
-            begin:
-            20,
-            end:
-            0,
-            curve:
-            Curves.easeOutExpo,
-          ),
-
-          SizedBox(
-            height:
-            22.h,
-          ),
-
-          // ------------------------------------------------------
-          // META
-          // ------------------------------------------------------
-
-          Row(
-            children: [
-              _ArchiveMeta(
-                number:
-                count
-                    .toString()
-                    .padLeft(
-                  2,
-                  '0',
-                ),
-                label:
-                'SAVED',
-                color:
-                _primary,
-              ),
-
-              SizedBox(
-                width:
-                22.w,
-              ),
-
-              _verticalDivider(),
-
-              SizedBox(
-                width:
-                22.w,
-              ),
-
-              _ArchiveMeta(
-                number:
-                '4K',
-                label:
-                'READY',
-                color:
-                _primary,
-              ),
-
-              SizedBox(
-                width:
-                22.w,
-              ),
-
-              _verticalDivider(),
-
-              SizedBox(
-                width:
-                22.w,
-              ),
-
-              _ArchiveMeta(
-                number:
-                '∞',
-                label:
-                'MOODS',
-                color:
-                _primary,
-              ),
-            ],
-          )
-              .animate()
-              .fadeIn(
-            delay:
-            const Duration(
-              milliseconds:
-              450,
-            ),
-            duration:
-            const Duration(
-              milliseconds:
-              700,
-            ),
-          )
-              .moveY(
-            begin:
-            20,
-            end:
-            0,
-            curve:
-            Curves.easeOutExpo,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // ARCHIVE HEADER
-  // ============================================================
-
-  Widget _buildArchiveHeader({
-    required int count,
-  }) {
-    return Padding(
-      padding:
-      EdgeInsets.fromLTRB(
-        22.w,
-        12.h,
-        22.w,
-        22.h,
-      ),
-
-      child:
-      Row(
-        crossAxisAlignment:
-        CrossAxisAlignment
-            .end,
-
-        children: [
-          Expanded(
-            child:
-            Column(
-              crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
-
-              children: [
-                Text(
-                  'ARCHIVE',
-
-                  style:
-                  GoogleFonts.bebasNeue(
-                    color:
-                    _primary,
-                    fontSize:
-                    43.sp,
-                    height:
-                    .82,
-                    letterSpacing:
-                    2.8,
-                  ),
-                ),
-
-                SizedBox(
-                  height:
-                  9.h,
-                ),
-
-                Row(
-                  children: [
-                    Container(
-                      width:
-                      25.w,
-                      height:
-                      2,
-
-                      color:
-                      _accent,
-                    ),
-
-                    SizedBox(
-                      width:
-                      9.w,
-                    ),
-
-                    Text(
-                      'YOUR VISUAL COLLECTION',
-
-                      style:
-                      GoogleFonts.inter(
-                        color:
-                        _secondary,
-                        fontSize:
-                        8.sp,
-                        fontWeight:
-                        FontWeight.w800,
-                        letterSpacing:
-                        1.7,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // COUNT
-          Container(
-            width:
-            42.w,
-            height:
-            42.w,
-
-            decoration:
-            BoxDecoration(
-              color:
-              _accent.withOpacity(
-                _isDark
-                    ? .10
-                    : .07,
-              ),
-
-              shape:
-              BoxShape.circle,
-
-              border:
-              Border.all(
-                color:
-                _accent.withOpacity(
-                  .16,
-                ),
-              ),
-            ),
-
-            child:
-            Center(
-              child:
-              Text(
-                count
-                    .toString()
-                    .padLeft(
-                  2,
-                  '0',
-                ),
-
-                style:
-                GoogleFonts.inter(
-                  color:
-                  _primary,
-                  fontSize:
-                  11.sp,
-                  fontWeight:
-                  FontWeight.w800,
-                  letterSpacing:
-                  1,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds:
-        600,
-      ),
-    )
-        .moveY(
-      begin:
-      20,
-      end:
-      0,
-      curve:
-      Curves.easeOutExpo,
-    );
-  }
-
-  // ============================================================
-  // END ARCHIVE
-  // ============================================================
-
-  Widget _buildEndArchive() {
-    return Padding(
-      padding:
-      EdgeInsets.symmetric(
-        vertical:
-        80.h,
-      ),
-
-      child:
-      Column(
-        children: [
-          Container(
-            width:
-            34.w,
-            height:
-            1,
-
-            color:
-            _divider,
-          ),
-
-          SizedBox(
-            height:
-            12.h,
-          ),
-
-          Text(
-            'END OF ARCHIVE',
-
-            style:
-            GoogleFonts.inter(
-              color:
-              _muted.withOpacity(
-                .65,
-              ),
-              fontSize:
-              8.sp,
-              fontWeight:
-              FontWeight.w700,
-              letterSpacing:
-              2.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
-  Widget _buildEmptyState() {
-    return Center(
-      child:
-      Padding(
-        padding:
-        EdgeInsets.all(
-          28.w,
-        ),
-
-        child:
-        Column(
-          mainAxisAlignment:
-          MainAxisAlignment
-              .center,
-
-          children: [
-            // Cinematic icon
-            SizedBox(
-              width:
-              110.w,
-              height:
-              110.w,
-
-              child:
-              Stack(
-                alignment:
-                Alignment
-                    .center,
-
-                children: [
-                  Container(
-                    width:
-                    110.w,
-                    height:
-                    110.w,
-
-                    decoration:
-                    BoxDecoration(
-                      shape:
-                      BoxShape
-                          .circle,
-
-                      border:
-                      Border.all(
-                        color:
-                        _accent
-                            .withOpacity(
-                          .18,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Container(
-                    width:
-                    78.w,
-                    height:
-                    78.w,
-
-                    decoration:
-                    BoxDecoration(
-                      shape:
-                      BoxShape
-                          .circle,
-
-                      color:
-                      _accent
-                          .withOpacity(
-                        .07,
-                      ),
-                    ),
-
-                    child:
-                    Icon(
-                      Icons
-                          .favorite_border_rounded,
-                      color:
-                      _accent
-                          .withOpacity(
-                        .65,
-                      ),
-                      size:
-                      32.sp,
-                    ),
-                  ),
-                ],
-              ),
-            )
-                .animate(
-              onPlay:
-                  (controller) =>
-                  controller.repeat(
-                    reverse:
-                    true,
-                  ),
-            )
-                .scale(
-              begin:
-              const Offset(
-                .94,
-                .94,
-              ),
-              end:
-              const Offset(
-                1.04,
-                1.04,
-              ),
-              duration:
-              const Duration(
-                milliseconds:
-                1800,
-              ),
-              curve:
-              Curves.easeInOut,
-            ),
-
-            SizedBox(
-              height:
-              30.h,
-            ),
-
-            Text(
-              'NOTHING SAVED',
-
-              style:
-              GoogleFonts.bebasNeue(
-                color:
-                _primary,
-                fontSize:
-                34.sp,
-                letterSpacing:
-                2,
-              ),
-            ),
-
-            SizedBox(
-              height:
-              10.h,
-            ),
-
-            Text(
-              'Your visual archive is waiting.\nSave wallpapers you want to keep.',
-
-              textAlign:
-              TextAlign.center,
-
-              style:
-              GoogleFonts.inter(
-                color:
-                _secondary,
-                fontSize:
-                13.sp,
-                height:
-                1.7,
-              ),
-            ),
-          ],
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds:
-        800,
-      ),
-    )
-        .moveY(
-      begin:
-      35,
-      end:
-      0,
-      curve:
-      Curves.easeOutExpo,
-    );
-  }
-
-  // ============================================================
-  // LOADING
-  // ============================================================
-
-  Widget _buildLoading() {
-    return Container(
-      color:
-      _background,
-
-      alignment:
-      Alignment.center,
-
-      child:
-      Column(
-        mainAxisSize:
-        MainAxisSize.min,
-
-        children: [
-          Container(
-            width:
-            54.w,
-            height:
-            54.w,
-
-            decoration:
-            BoxDecoration(
-              color:
-              _accent.withOpacity(
-                .08,
-              ),
-
-              shape:
-              BoxShape.circle,
-
-              border:
-              Border.all(
-                color:
-                _accent.withOpacity(
-                  .12,
-                ),
-              ),
-            ),
-
-            child:
-            Padding(
-              padding:
-              EdgeInsets.all(
-                15.w,
-              ),
-
-              child:
-              CircularProgressIndicator(
-                strokeWidth:
-                1.5,
-
-                color:
-                _accent,
-              ),
-            ),
-          )
-              .animate(
-            onPlay:
-                (controller) =>
-                controller.repeat(
-                  reverse:
-                  true,
-                ),
-          )
-              .scale(
-            begin:
-            const Offset(
-              .94,
-              .94,
-            ),
-            end:
-            const Offset(
-              1.04,
-              1.04,
-            ),
-            duration:
-            const Duration(
-              milliseconds:
-              1200,
-            ),
-          ),
-
-          SizedBox(
-            height:
-            18.h,
-          ),
-
-          Text(
-            'LOADING ARCHIVE',
-
-            style:
-            GoogleFonts.inter(
-              color:
-              _secondary.withOpacity(
-                .65,
-              ),
-              fontSize:
-              8.sp,
-              fontWeight:
-              FontWeight.w800,
-              letterSpacing:
-              2.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // ERROR
-  // ============================================================
-
-  Widget _buildError() {
-    return Container(
-      color:
-      _background,
-
-      alignment:
-      Alignment.center,
-
-      padding:
-      EdgeInsets.all(
-        28.w,
-      ),
-
-      child:
-      Column(
-        mainAxisSize:
-        MainAxisSize.min,
-
-        children: [
-          Container(
-            width:
-            70.w,
-            height:
-            70.w,
-
-            decoration:
-            BoxDecoration(
-              color:
-              _accent.withOpacity(
-                .08,
-              ),
-
-              shape:
-              BoxShape.circle,
-
-              border:
-              Border.all(
-                color:
-                _accent.withOpacity(
-                  .13,
-                ),
-              ),
-            ),
-
-            child:
-            Icon(
-              Icons
-                  .cloud_off_rounded,
-              color:
-              _accent,
-              size:
-              32.sp,
-            ),
-          ),
-
-          SizedBox(
-            height:
-            18.h,
-          ),
-
-          Text(
-            'ARCHIVE UNAVAILABLE',
-
-            textAlign:
-            TextAlign.center,
-
-            style:
-            GoogleFonts.bebasNeue(
-              color:
-              _primary,
-              fontSize:
-              30.sp,
-              letterSpacing:
-              1.8,
-            ),
-          ),
-
-          SizedBox(
-            height:
-            8.h,
-          ),
-
-          Text(
-            'Check your connection and try again.',
-
-            textAlign:
-            TextAlign.center,
-
-            style:
-            GoogleFonts.inter(
-              color:
-              _secondary,
-              fontSize:
-              12.sp,
-            ),
-          ),
-
-          SizedBox(
-            height:
-            22.h,
-          ),
-
-          GestureDetector(
-            onTap: () {
-              HapticFeedback
-                  .selectionClick();
-
-              setState(() {});
-            },
-
-            child:
-            Container(
-              padding:
-              EdgeInsets.symmetric(
-                horizontal:
-                20.w,
-                vertical:
-                11.h,
-              ),
-
-              decoration:
-              BoxDecoration(
-                color:
-                _accent.withOpacity(
-                  .09,
-                ),
-
-                borderRadius:
-                BorderRadius
-                    .circular(
-                  15.r,
-                ),
-
-                border:
-                Border.all(
-                  color:
-                  _accent.withOpacity(
-                    .13,
-                  ),
-                ),
-              ),
-
-              child:
-              Text(
-                'TRY AGAIN',
-
-                style:
-                GoogleFonts.inter(
-                  color:
-                  _accent,
-                  fontSize:
-                  10.sp,
-                  fontWeight:
-                  FontWeight.w800,
-                  letterSpacing:
-                  1.3,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // DIVIDER
-  // ============================================================
-
-  Widget _verticalDivider() {
-    return Container(
-      width:
-      1,
-      height:
-      26.h,
-      color:
-      _divider,
     );
   }
 }
 
-// ==================================================================
-// ARCHIVE META
-// ==================================================================
+// ============================================================================
+// INTRO ANIMATION
+// ============================================================================
 
-class _ArchiveMeta
-    extends StatelessWidget {
-  final String number;
-  final String label;
-  final Color color;
+class _IntroAnimation extends StatelessWidget {
+  final AnimationController controller;
+  final Widget child;
 
-  const _ArchiveMeta({
-    required this.number,
-    required this.label,
-    required this.color,
+  const _IntroAnimation({required this.controller, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, child) {
+        final value = Curves.easeOutCubic.transform(controller.value);
+
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 18.h * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ============================================================================
+// HEADER
+// ============================================================================
+
+class _SavedHeader extends StatelessWidget {
+  final int count;
+
+  final Color surface;
+  final Color surfaceSoft;
+  final Color divider;
+  final Color primary;
+  final Color secondary;
+  final Color accent;
+
+  const _SavedHeader({
+    required this.count,
+    required this.surface,
+    required this.surfaceSoft,
+    required this.divider,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
   });
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
-    final isDark =
-        Theme.of(context)
-            .brightness ==
-            Brightness.dark;
-
-    final muted =
-    isDark
-        ? AppColors.darkMuted
-        : AppColors.lightMuted;
-
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment
-          .start,
-
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        Text(
-          number,
+        Container(
+          width: 46.w,
+          height: 46.w,
+          decoration: BoxDecoration(
+            color: surfaceSoft,
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(color: divider),
+          ),
+          child: Icon(Icons.bookmark_rounded, color: primary, size: 17.sp),
+        ),
 
-          style:
-          GoogleFonts.bebasNeue(
-            color:
-            color,
-            fontSize:
-            25.sp,
-            height:
-            .8,
-            letterSpacing:
-            1,
+        SizedBox(width: 12.w),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 5.w,
+                    height: 5.w,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(width: 7.w),
+                  Text(
+                    'PERSONAL',
+                    style: GoogleFonts.manrope(
+                      color: secondary,
+                      fontSize: 7.sp,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.7,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 2.h),
+              Text(
+                'SAVED WALLPAPERS',
+                style: GoogleFonts.manrope(
+                  color: primary,
+                  fontSize: 14.5.sp,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.4,
+                ),
+              ),
+            ],
           ),
         ),
 
-        SizedBox(
-          height:
-          5.h,
-        ),
-
-        Text(
-          label,
-
-          style:
-          GoogleFonts.inter(
-            color:
-            muted,
-            fontSize:
-            7.sp,
-            fontWeight:
-            FontWeight.w800,
-            letterSpacing:
-            1.5,
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(13.r),
+            border: Border.all(color: divider),
+          ),
+          child: Text(
+            count.toString().padLeft(2, '0'),
+            style: GoogleFonts.manrope(
+              color: primary,
+              fontSize: 8.sp,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ],
@@ -1435,285 +490,409 @@ class _ArchiveMeta
   }
 }
 
-// ==================================================================
-// SAVED WALLPAPER CARD
-// ==================================================================
+// ============================================================================
+// HERO
+// ============================================================================
 
-class _SavedWallpaperCard
-    extends StatefulWidget {
-  final int index;
-  final String image;
-  final String category;
-  final double height;
+class _SavedHero extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final int count;
+
+  final Color background;
+  final Color surface;
+  final Color primary;
+  final Color secondary;
+  final Color muted;
+  final Color divider;
+  final Color accent;
+
   final VoidCallback onTap;
 
-  const _SavedWallpaperCard({
-    required this.index,
-    required this.image,
-    required this.category,
-    required this.height,
+  const _SavedHero({
+    required this.item,
+    required this.count,
+    required this.background,
+    required this.surface,
+    required this.primary,
+    required this.secondary,
+    required this.muted,
+    required this.divider,
+    required this.accent,
     required this.onTap,
   });
 
   @override
-  State<_SavedWallpaperCard>
-  createState() =>
-      _SavedWallpaperCardState();
-}
+  Widget build(BuildContext context) {
+    final image = item['imageUrl']?.toString() ?? '';
 
-class _SavedWallpaperCardState
-    extends State<
-        _SavedWallpaperCard>
-    with
-        SingleTickerProviderStateMixin {
-  bool _pressed = false;
+    final category = item['category']?.toString() ?? 'Saved';
 
-  late final AnimationController
-  _motionController;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14.w, 18.h, 14.w, 25.h),
+      child: GestureDetector(
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30.r),
+          child: SizedBox(
+            height: 450.h,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // ==================================================
+                // IMAGE
+                // ==================================================
 
-  @override
-  void initState() {
-    super.initState();
+                image.isEmpty
+                    ? Container(color: surface)
+                    : Image.network(
+                        image,
+                        fit: BoxFit.cover,
+                        cacheWidth: 1000,
+                        filterQuality: FilterQuality.medium,
+                        gaplessPlayback: true,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: surface,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              color: muted,
+                              size: 28.sp,
+                            ),
+                          );
+                        },
+                      ),
 
-    _motionController =
-    AnimationController(
-      vsync:
-      this,
+                // ==================================================
+                // DEPTH
+                // ==================================================
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: const [0, .46, 1],
+                          colors: [
+                            background.withOpacity(.10),
+                            background.withOpacity(.04),
+                            background.withOpacity(.96),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
-      duration:
-      const Duration(
-        seconds:
-        8,
+                // ==================================================
+                // TOP
+                // ==================================================
+                Positioned(
+                  top: 16.h,
+                  left: 16.w,
+                  right: 16.w,
+                  child: Row(
+                    children: [
+                      _HeroPill(
+                        text: 'SAVED',
+                        background: surface.withOpacity(.72),
+                        foreground: primary,
+                        border: divider,
+                      ),
+                      const Spacer(),
+                      _HeroPill(
+                        text: '4K',
+                        background: surface.withOpacity(.72),
+                        foreground: primary,
+                        border: divider,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ==================================================
+                // SIDE INDEX
+                // ==================================================
+                Positioned(
+                  right: 17.w,
+                  top: 76.h,
+                  child: RotatedBox(
+                    quarterTurns: 1,
+                    child: Text(
+                      'FRAME 01',
+                      style: GoogleFonts.manrope(
+                        color: primary.withOpacity(.42),
+                        fontSize: 6.sp,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ==================================================
+                // CONTENT
+                // ==================================================
+                Positioned(
+                  left: 18.w,
+                  right: 18.w,
+                  bottom: 18.h,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 6.w,
+                            height: 6.w,
+                            decoration: BoxDecoration(
+                              color: accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              category.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.manrope(
+                                color: primary.withOpacity(.68),
+                                fontSize: 7.sp,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: 6.h),
+
+                      Text(
+                        'YOUR\nFAVOURITE',
+                        style: GoogleFonts.bebasNeue(
+                          color: primary,
+                          fontSize: 54.sp,
+                          height: .82,
+                          letterSpacing: .3,
+                        ),
+                      ),
+
+                      SizedBox(height: 10.h),
+
+                      Row(
+                        children: [
+                          Text(
+                            '${count.toString().padLeft(2, '0')} SAVED',
+                            style: GoogleFonts.manrope(
+                              color: primary.withOpacity(.56),
+                              fontSize: 7.sp,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Container(
+                            width: 1,
+                            height: 12.h,
+                            color: primary.withOpacity(.22),
+                          ),
+                          SizedBox(width: 12.w),
+                          Text(
+                            '4K',
+                            style: GoogleFonts.manrope(
+                              color: primary.withOpacity(.56),
+                              fontSize: 7.sp,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: 13.h),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 1,
+                              color: primary.withOpacity(.18),
+                            ),
+                          ),
+                          SizedBox(width: 9.w),
+                          Container(
+                            width: 32.w,
+                            height: 32.w,
+                            decoration: BoxDecoration(
+                              color: surface.withOpacity(.78),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: divider),
+                            ),
+                            child: Icon(
+                              Icons.arrow_outward_rounded,
+                              color: primary,
+                              size: 14.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
-    )..repeat(
-      reverse:
-      true,
     );
   }
+}
+
+// ============================================================================
+// HERO PILL
+// ============================================================================
+
+class _HeroPill extends StatelessWidget {
+  final String text;
+  final Color background;
+  final Color foreground;
+  final Color border;
+
+  const _HeroPill({
+    required this.text,
+    required this.background,
+    required this.foreground,
+    required this.border,
+  });
 
   @override
-  void dispose() {
-    _motionController
-        .dispose();
-
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.manrope(
+          color: foreground,
+          fontSize: 6.5.sp,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1,
+        ),
+      ),
+    );
   }
+}
+
+// ============================================================================
+// SAVED WALLPAPER CARD
+// ============================================================================
+
+class _SavedWallpaperCard extends StatefulWidget {
+  final String image;
+  final String category;
+  final int index;
+  final double height;
+
+  final Color accent;
+  final Color surface;
+  final Color primary;
+  final Color muted;
+  final Color divider;
+
+  final VoidCallback onTap;
+
+  const _SavedWallpaperCard({
+    required this.image,
+    required this.category,
+    required this.index,
+    required this.height,
+    required this.accent,
+    required this.surface,
+    required this.primary,
+    required this.muted,
+    required this.divider,
+    required this.onTap,
+  });
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
+  State<_SavedWallpaperCard> createState() => _SavedWallpaperCardState();
+}
+
+class _SavedWallpaperCardState extends State<_SavedWallpaperCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown:
-          (_) {
-        setState(() {
-          _pressed =
-          true;
-        });
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        if (!_pressed) {
+          setState(() {
+            _pressed = true;
+          });
+        }
       },
-
-      onTapCancel:
-          () {
-        setState(() {
-          _pressed =
-          false;
-        });
+      onTapCancel: () {
+        if (_pressed) {
+          setState(() {
+            _pressed = false;
+          });
+        }
       },
-
-      onTapUp:
-          (_) {
-        setState(() {
-          _pressed =
-          false;
-        });
+      onTapUp: (_) {
+        if (_pressed) {
+          setState(() {
+            _pressed = false;
+          });
+        }
 
         widget.onTap();
       },
-
-      child:
-      AnimatedScale(
-        scale:
-        _pressed
-            ? .95
-            : 1,
-
-        duration:
-        const Duration(
-          milliseconds:
-          180,
-        ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        Hero(
-          tag:
-          widget.image,
-
-          child:
-          ClipRRect(
-            borderRadius:
-            BorderRadius
-                .circular(
-              34.r,
-            ),
-
-            child:
-            SizedBox(
-              height:
-              widget.height,
-
-              child:
-              Stack(
-                fit:
-                StackFit.expand,
-
+      child: AnimatedScale(
+        scale: _pressed ? .96 : 1,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        child: Hero(
+          tag: widget.image,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22.r),
+            child: SizedBox(
+              height: widget.height,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
                   // ==================================================
-                  // MOVING IMAGE
+                  // IMAGE
                   // ==================================================
 
-                  AnimatedBuilder(
-                    animation:
-                    _motionController,
-
-                    builder:
-                        (
-                        context,
-                        child,
-                        ) {
-                      final progress =
-                          _motionController
-                              .value;
-
-                      final scale =
-                          1.05 +
-                              (progress *
-                                  .045);
-
-                      final dx =
-                          (progress -
-                              .5) *
-                              7;
-
-                      final dy =
-                          (progress -
-                              .5) *
-                              5;
-
-                      return Transform
-                          .translate(
-                        offset:
-                        Offset(
-                          dx,
-                          dy,
-                        ),
-
-                        child:
-                        Transform
-                            .scale(
-                          scale:
-                          scale,
-                          child:
-                          child,
-                        ),
-                      );
-                    },
-
-                    child:
-                    Image.network(
-                      widget.image,
-
-                      fit:
-                      BoxFit.cover,
-
-                      filterQuality:
-                      FilterQuality
-                          .high,
-
-                      errorBuilder:
-                          (
-                          context,
-                          error,
-                          stackTrace,
-                          ) {
-                        final isDark =
-                            Theme.of(
-                              context,
-                            ).brightness ==
-                                Brightness
-                                    .dark;
-
-                        return Container(
-                          color:
-                          isDark
-                              ? AppColors
-                              .darkSurface
-                              : AppColors
-                              .lightSurface,
-
-                          alignment:
-                          Alignment
-                              .center,
-
-                          child:
-                          Icon(
-                            Icons
-                                .broken_image_outlined,
-
-                            color:
-                            isDark
-                                ? AppColors
-                                .darkMuted
-                                : AppColors
-                                .lightMuted,
-
-                            size:
-                            28.sp,
-                          ),
-                        );
-                      },
-                    ),
+                  _SavedImage(
+                    image: widget.image,
+                    fallback: widget.surface,
+                    muted: widget.muted,
                   ),
 
                   // ==================================================
-                  // CINEMATIC GRADIENT
+                  // DEPTH
                   // ==================================================
-
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
-                            begin:
-                            Alignment
-                                .topCenter,
-                            end:
-                            Alignment
-                                .bottomCenter,
-                            stops: [
-                              0,
-                              .30,
-                              .65,
-                              1,
-                            ],
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0, .50, 1],
                             colors: [
-                              Color(
-                                0x1A000000,
-                              ),
-                              Colors
-                                  .transparent,
-                              Color(
-                                0x40000000,
-                              ),
-                              Color(
-                                0xE6000000,
-                              ),
+                              widget.surface.withOpacity(.05),
+                              widget.surface.withOpacity(.01),
+                              widget.surface.withOpacity(.92),
                             ],
                           ),
                         ),
@@ -1722,273 +901,126 @@ class _SavedWallpaperCardState
                   ),
 
                   // ==================================================
-                  // TOP INDEX
+                  // NUMBER
                   // ==================================================
-
                   Positioned(
-                    top:
-                    17.h,
-                    left:
-                    17.w,
-
-                    child:
-                    Row(
-                      children: [
-                        Text(
-                          (widget.index +
-                              1)
-                              .toString()
-                              .padLeft(
-                            2,
-                            '0',
-                          ),
-
-                          style:
-                          GoogleFonts.inter(
-                            color:
-                            Colors.white.withOpacity(
-                              .72,
-                            ),
-                            fontSize:
-                            9.sp,
-                            fontWeight:
-                            FontWeight.w800,
-                            letterSpacing:
-                            1.8,
-                          ),
-                        ),
-
-                        SizedBox(
-                          width:
-                          8.w,
-                        ),
-
-                        Container(
-                          width:
-                          18.w,
-                          height:
-                          1,
-                          color:
-                          Colors.white.withOpacity(
-                            .45,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ==================================================
-                  // SAVED HEART
-                  // ==================================================
-
-                  Positioned(
-                    top:
-                    15.h,
-                    right:
-                    15.w,
-
-                    child:
-                    AnimatedScale(
-                      scale:
-                      _pressed
-                          ? .82
-                          : 1,
-
-                      duration:
-                      const Duration(
-                        milliseconds:
-                        200,
+                    top: 12.h,
+                    left: 12.w,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.w,
+                        vertical: 6.h,
                       ),
-
-                      child:
-                      Container(
-                        width:
-                        34.w,
-                        height:
-                        34.w,
-
-                        decoration:
-                        BoxDecoration(
-                          color:
-                          Colors.black.withOpacity(
-                            .20,
-                          ),
-                          shape:
-                          BoxShape
-                              .circle,
+                      decoration: BoxDecoration(
+                        color: widget.surface.withOpacity(.70),
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: widget.divider.withOpacity(.7),
                         ),
-
-                        child:
-                        const Icon(
-                          Icons
-                              .favorite_rounded,
-                          color:
-                          Colors.white,
+                      ),
+                      child: Text(
+                        (widget.index + 1).toString().padLeft(2, '0'),
+                        style: GoogleFonts.manrope(
+                          color: widget.primary,
+                          fontSize: 7.sp,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .8,
                         ),
                       ),
                     ),
                   ),
 
                   // ==================================================
-                  // BOTTOM CONTENT
+                  // BOOKMARK
                   // ==================================================
-
                   Positioned(
-                    left:
-                    18.w,
-                    right:
-                    18.w,
-                    bottom:
-                    18.h,
+                    top: 12.h,
+                    right: 12.w,
+                    child: Container(
+                      width: 32.w,
+                      height: 32.w,
+                      decoration: BoxDecoration(
+                        color: widget.surface.withOpacity(.68),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: widget.divider.withOpacity(.7),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.bookmark_rounded,
+                        color: widget.accent,
+                        size: 15.sp,
+                      ),
+                    ),
+                  ),
 
-                    child:
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-
+                  // ==================================================
+                  // BOTTOM
+                  // ==================================================
+                  Positioned(
+                    left: 14.w,
+                    right: 14.w,
+                    bottom: 14.h,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             Container(
-                              width:
-                              5.w,
-                              height:
-                              5.w,
-
-                              decoration:
-                              const BoxDecoration(
-                                color:
-                                Colors.white,
-                                shape:
-                                BoxShape
-                                    .circle,
+                              width: 5.w,
+                              height: 5.w,
+                              decoration: BoxDecoration(
+                                color: widget.accent,
+                                shape: BoxShape.circle,
                               ),
                             ),
-
-                            SizedBox(
-                              width:
-                              7.w,
-                            ),
-
+                            SizedBox(width: 7.w),
                             Expanded(
-                              child:
-                              Text(
-                                widget
-                                    .category
-                                    .toUpperCase(),
-
-                                maxLines:
-                                1,
-
-                                overflow:
-                                TextOverflow
-                                    .ellipsis,
-
-                                style:
-                                GoogleFonts.inter(
-                                  color:
-                                  Colors.white.withOpacity(
-                                    .70,
-                                  ),
-                                  fontSize:
-                                  8.sp,
-                                  fontWeight:
-                                  FontWeight.w800,
-                                  letterSpacing:
-                                  1.4,
+                              child: Text(
+                                widget.category.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.manrope(
+                                  color: widget.primary.withOpacity(.58),
+                                  fontSize: 6.5.sp,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: .85,
                                 ),
                               ),
                             ),
                           ],
                         ),
 
-                        SizedBox(
-                          height:
-                          8.h,
-                        ),
+                        SizedBox(height: 5.h),
 
                         Text(
-                          _getName(
-                            widget.image,
-                          ).toUpperCase(),
-
-                          maxLines:
-                          2,
-
-                          overflow:
-                          TextOverflow
-                              .ellipsis,
-
-                          style:
-                          GoogleFonts.bebasNeue(
-                            color:
-                            Colors.white,
-                            fontSize:
-                            42.sp,
-                            height:
-                            .80,
-                            letterSpacing:
-                            1.8,
+                          'FRAME ${(widget.index + 1).toString().padLeft(2, '0')}',
+                          style: GoogleFonts.bebasNeue(
+                            color: widget.primary,
+                            fontSize: 25.sp,
+                            height: .9,
+                            letterSpacing: .2,
                           ),
                         ),
 
-                        SizedBox(
-                          height:
-                          11.h,
-                        ),
+                        SizedBox(height: 8.h),
 
                         Row(
                           children: [
                             Expanded(
-                              child:
-                              AnimatedContainer(
-                                duration:
-                                const Duration(
-                                  milliseconds:
-                                  500,
-                                ),
-
-                                height:
-                                1,
-
-                                color:
-                                Colors.white.withOpacity(
-                                  _pressed
-                                      ? .55
-                                      : .22,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 100),
+                                height: 1,
+                                color: widget.primary.withOpacity(
+                                  _pressed ? .40 : .18,
                                 ),
                               ),
                             ),
-
-                            SizedBox(
-                              width:
-                              10.w,
-                            ),
-
-                            AnimatedRotation(
-                              turns:
-                              _pressed
-                                  ? .12
-                                  : 0,
-
-                              duration:
-                              const Duration(
-                                milliseconds:
-                                300,
-                              ),
-
-                              child:
-                              Icon(
-                                Icons
-                                    .arrow_outward_rounded,
-                                color:
-                                Colors.white.withOpacity(
-                                  .78,
-                                ),
-                                size:
-                                15.sp,
-                              ),
+                            SizedBox(width: 8.w),
+                            Icon(
+                              Icons.arrow_outward_rounded,
+                              color: widget.primary.withOpacity(.65),
+                              size: 13.sp,
                             ),
                           ],
                         ),
@@ -2001,112 +1033,267 @@ class _SavedWallpaperCardState
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      Duration(
-        milliseconds:
-        widget.index *
-            110,
-      ),
+    );
+  }
+}
 
-      duration:
-      const Duration(
-        milliseconds:
-        900,
-      ),
-    )
-        .moveY(
-      begin:
-      90,
-      end:
-      0,
+// ============================================================================
+// IMAGE
+// ============================================================================
 
-      delay:
-      Duration(
-        milliseconds:
-        widget.index *
-            110,
-      ),
+class _SavedImage extends StatelessWidget {
+  final String image;
+  final Color fallback;
+  final Color muted;
 
-      duration:
-      const Duration(
-        milliseconds:
-        950,
-      ),
+  const _SavedImage({
+    required this.image,
+    required this.fallback,
+    required this.muted,
+  });
 
-      curve:
-      Curves.easeOutExpo,
-    )
-        .scale(
-      begin:
-      const Offset(
-        .90,
-        .90,
-      ),
+  @override
+  Widget build(BuildContext context) {
+    if (image.isEmpty) {
+      return Container(
+        color: fallback,
+        alignment: Alignment.center,
+        child: Icon(Icons.broken_image_outlined, color: muted, size: 26.sp),
+      );
+    }
 
-      end:
-      const Offset(
-        1,
-        1,
-      ),
+    return Image.network(
+      image,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.low,
+      cacheWidth: 700,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: fallback,
+          alignment: Alignment.center,
+          child: Icon(Icons.broken_image_outlined, color: muted, size: 26.sp),
+        );
+      },
+    );
+  }
+}
 
-      duration:
-      const Duration(
-        milliseconds:
-        950,
-      ),
+// ============================================================================
+// EMPTY
+// ============================================================================
 
-      curve:
-      Curves.easeOutExpo,
-    )
-        .blurXY(
-      begin:
-      4,
-      end:
-      0,
+class _EmptyState extends StatelessWidget {
+  final Color background;
+  final Color primary;
+  final Color secondary;
+  final Color accent;
 
-      duration:
-      const Duration(
-        milliseconds:
-        800,
+  const _EmptyState({
+    required this.background,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: background,
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(28.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 78.w,
+                  height: 78.w,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(.07),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accent.withOpacity(.14)),
+                  ),
+                  child: Icon(
+                    Icons.bookmark_border_rounded,
+                    color: accent,
+                    size: 30.sp,
+                  ),
+                ),
+
+                SizedBox(height: 18.h),
+
+                Text(
+                  'NOTHING SAVED',
+                  style: GoogleFonts.bebasNeue(
+                    color: primary,
+                    fontSize: 32.sp,
+                    letterSpacing: .5,
+                  ),
+                ),
+
+                SizedBox(height: 6.h),
+
+                Text(
+                  'Save a wallpaper to see it here.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.manrope(
+                    color: secondary,
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
+}
 
-  // ============================================================
-  // WALLPAPER NAME
-  // ============================================================
+// ============================================================================
+// LOADING
+// ============================================================================
 
-  String _getName(
-      String url,
-      ) {
-    String fileName =
-        url.split('/').last;
+class _LoadingState extends StatelessWidget {
+  final Color background;
+  final Color accent;
 
-    fileName =
-        fileName.replaceAll(
-          RegExp(
-            r'\.(jpg|jpeg|png|webp)$',
+  const _LoadingState({required this.background, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: background,
+      alignment: Alignment.center,
+      child: SizedBox(
+        width: 34.w,
+        height: 34.w,
+        child: CircularProgressIndicator(strokeWidth: 1.5, color: accent),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// ERROR
+// ============================================================================
+
+class _ErrorState extends StatelessWidget {
+  final Color background;
+  final Color primary;
+  final Color secondary;
+  final Color accent;
+
+  final VoidCallback onRetry;
+
+  const _ErrorState({
+    required this.background,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: background,
+      alignment: Alignment.center,
+      padding: EdgeInsets.all(28.w),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 68.w,
+            height: 68.w,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(.07),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.cloud_off_rounded, color: accent, size: 29.sp),
           ),
-          '',
-        );
 
-    fileName =
-        fileName.replaceAll(
-          RegExp(
-            r'-\d+x\d+-\d+$',
+          SizedBox(height: 16.h),
+
+          Text(
+            'SAVES UNAVAILABLE',
+            style: GoogleFonts.bebasNeue(
+              color: primary,
+              fontSize: 29.sp,
+              letterSpacing: .8,
+            ),
           ),
-          '',
-        );
 
-    fileName =
-        fileName.replaceAll(
-          '-',
-          ' ',
-        );
+          SizedBox(height: 5.h),
 
-    return fileName;
+          Text(
+            'Try again.',
+            style: GoogleFonts.manrope(
+              color: secondary,
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+
+          SizedBox(height: 17.h),
+
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 9.h),
+              decoration: BoxDecoration(
+                color: accent.withOpacity(.08),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Text(
+                'RETRY',
+                style: GoogleFonts.manrope(
+                  color: accent,
+                  fontSize: 7.sp,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// END
+// ============================================================================
+
+class _EndMark extends StatelessWidget {
+  final Color divider;
+  final Color muted;
+
+  const _EndMark({required this.divider, required this.muted});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: 15.h, bottom: 100.h),
+      child: Column(
+        children: [
+          Container(width: 30.w, height: 1, color: divider),
+          SizedBox(height: 10.h),
+          Text(
+            'END',
+            style: GoogleFonts.manrope(
+              color: muted.withOpacity(.35),
+              fontSize: 6.sp,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

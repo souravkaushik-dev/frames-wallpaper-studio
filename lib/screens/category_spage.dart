@@ -1,92 +1,73 @@
-import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:dotty/constants/app_colors.dart';
-import 'package:dotty/screens/previewscreen.dart';
+import 'package:dotty/screens/category_spage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 
-class CategoryScreen extends StatefulWidget {
-  final String title;
-  final List<String> wallpapers;
+import 'category_screen.dart';
 
-  const CategoryScreen({
+class CategoriesPage extends StatefulWidget {
+  const CategoriesPage({
     super.key,
-    required this.title,
-    required this.wallpapers,
   });
 
   @override
-  State<CategoryScreen> createState() =>
-      _CategoryScreenState();
+  State<CategoriesPage> createState() =>
+      _CategoriesPageState();
 }
 
-class _CategoryScreenState extends State<CategoryScreen>
-    with
-        SingleTickerProviderStateMixin,
-        WidgetsBindingObserver {
+class _CategoriesPageState
+    extends State<CategoriesPage>
+    with SingleTickerProviderStateMixin {
   // ============================================================
-  // HERO
-  // ============================================================
-
-  late final PageController _heroController;
-  late final AnimationController _heroMotionController;
-
-  Timer? _heroTimer;
-
-  int _heroIndex = 0;
-
-  bool _screenActive = true;
-  bool _backPressed = false;
-
-  // ============================================================
-  // THEME
+  // DATA
   // ============================================================
 
-  bool get _isDark =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+  late Future<Map<String, dynamic>> _future;
 
-  Color get _background =>
-      _isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground;
+  List<MapEntry<String, dynamic>> _categories = [];
 
-  Color get _surface =>
-      _isDark
-          ? AppColors.darkSurface
-          : AppColors.lightSurface;
+  // ============================================================
+  // GESTURE
+  // ============================================================
 
-  Color get _surfaceSoft =>
-      _isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
+  double _dragX = 0;
+  double _dragY = 0;
 
-  Color get _primary =>
-      _isDark
-          ? AppColors.darkPrimary
-          : AppColors.lightPrimary;
+  bool _dragging = false;
+  bool _animating = false;
+  bool _expanded = false;
 
-  Color get _secondary =>
-      _isDark
-          ? AppColors.darkSecondary
-          : AppColors.lightSecondary;
+  // ============================================================
+  // ANIMATION
+  // ============================================================
 
-  Color get _muted =>
-      _isDark
-          ? AppColors.darkMuted
-          : AppColors.lightMuted;
+  late final AnimationController _controller;
 
-  Color get _divider =>
-      _isDark
-          ? AppColors.darkDivider
-          : AppColors.lightDivider;
+  Animation<double>? _xAnimation;
+  Animation<double>? _yAnimation;
 
-  Color get _accent =>
-      AppColors.accent;
+  double _startX = 0;
+  double _endX = 0;
+
+  double _startY = 0;
+  double _endY = 0;
+
+  // ============================================================
+  // DECK
+  // ============================================================
+
+  static const int _visibleCards = 5;
+
+  double get _stackSpacing => 48.h;
+
+  double get _spreadSpacing => 105.h;
 
   // ============================================================
   // INIT
@@ -96,101 +77,20 @@ class _CategoryScreenState extends State<CategoryScreen>
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance
-        .addObserver(this);
+    _future = _fetchCategories();
 
-    _heroController =
-        PageController();
-
-    _heroMotionController =
-    AnimationController(
+    _controller = AnimationController(
       vsync: this,
-      duration:
-      const Duration(seconds: 7),
-    )..repeat(reverse: true);
-
-    _startHeroRotation();
-  }
-
-  // ============================================================
-  // APP LIFECYCLE
-  // ============================================================
-
-  @override
-  void didChangeAppLifecycleState(
-      AppLifecycleState state,
-      ) {
-    _screenActive =
-        state ==
-            AppLifecycleState.resumed;
-
-    if (_screenActive) {
-      _startHeroRotation();
-    } else {
-      _heroTimer?.cancel();
-      _heroTimer = null;
-    }
-  }
-
-  // ============================================================
-  // HERO AUTO ROTATION
-  // ============================================================
-
-  void _startHeroRotation() {
-    _heroTimer?.cancel();
-    _heroTimer = null;
-
-    if (widget.wallpapers.length <= 1) {
-      return;
-    }
-
-    if (!_screenActive) {
-      return;
-    }
-
-    _heroTimer = Timer.periodic(
-      const Duration(seconds: 5),
-          (_) {
-        if (!mounted ||
-            !_screenActive ||
-            !_heroController.hasClients) {
-          return;
-        }
-
-        final nextIndex =
-            (_heroIndex + 1) %
-                widget.wallpapers.length;
-
-        _heroController.animateToPage(
-          nextIndex,
-          duration:
-          const Duration(
-            milliseconds: 1200,
-          ),
-          curve:
-          Curves.easeInOutCubic,
-        );
-      },
+      duration: const Duration(
+        milliseconds: 520,
+      ),
     );
-  }
 
-  // ============================================================
-  // HERO PAGE CHANGE
-  // ============================================================
+    _controller.addListener(_animate);
 
-  void _onHeroChanged(
-      int index,
-      ) {
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _heroIndex = index;
-    });
-
-    _heroMotionController
-        .forward(from: 0);
+    _controller.addStatusListener(
+      _animationFinished,
+    );
   }
 
   // ============================================================
@@ -199,15 +99,593 @@ class _CategoryScreenState extends State<CategoryScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance
-        .removeObserver(this);
-
-    _heroTimer?.cancel();
-
-    _heroController.dispose();
-    _heroMotionController.dispose();
-
+    _controller.dispose();
     super.dispose();
+  }
+
+  // ============================================================
+  // API
+  // ============================================================
+
+  Future<Map<String, dynamic>>
+  _fetchCategories() async {
+    final apiUrl = dotenv.env['API_URL'];
+
+    if (apiUrl == null ||
+        apiUrl.trim().isEmpty) {
+      throw Exception(
+        'API_URL is not configured',
+      );
+    }
+
+    final response = await http.get(
+      Uri.parse(apiUrl),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to load categories',
+      );
+    }
+
+    final decoded =
+    jsonDecode(response.body);
+
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception(
+        'Invalid API response',
+      );
+    }
+
+    return decoded;
+  }
+
+  // ============================================================
+  // PREPARE
+  // ============================================================
+
+  void _prepareCategories(
+      Map<String, dynamic> data,
+      ) {
+    if (_categories.isNotEmpty) {
+      return;
+    }
+
+    final raw =
+    data['categories'];
+
+    if (raw is! Map) {
+      return;
+    }
+
+    _categories = raw.entries
+        .map(
+          (entry) =>
+          MapEntry<String, dynamic>(
+            entry.key.toString(),
+            entry.value,
+          ),
+    )
+        .toList();
+  }
+
+  // ============================================================
+  // ANIMATION
+  // ============================================================
+
+  void _animate() {
+    if (!mounted) {
+      return;
+    }
+
+    if (_xAnimation != null) {
+      _dragX =
+          _xAnimation!.value;
+    }
+
+    if (_yAnimation != null) {
+      _dragY =
+          _yAnimation!.value;
+    }
+
+    setState(() {});
+  }
+
+  // ============================================================
+  // ANIMATION FINISHED
+  // ============================================================
+
+  void _animationFinished(
+      AnimationStatus status,
+      ) {
+    if (status !=
+        AnimationStatus.completed) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // LEFT / RIGHT
+    // ----------------------------------------------------------
+
+    if (_endX.abs() > 100) {
+      _moveCurrentToBack();
+    }
+
+    // ----------------------------------------------------------
+    // SWIPE UP
+    // ----------------------------------------------------------
+
+    if (_endY < -100) {
+      _moveCurrentToBack();
+
+      _expanded = false;
+    }
+
+    // ----------------------------------------------------------
+    // RESET
+    // ----------------------------------------------------------
+
+    _dragX = 0;
+    _dragY = 0;
+
+    _startX = 0;
+    _endX = 0;
+
+    _startY = 0;
+    _endY = 0;
+
+    _xAnimation = null;
+    _yAnimation = null;
+
+    _animating = false;
+
+    setState(() {});
+  }
+
+  // ============================================================
+  // MOVE CARD
+  // ============================================================
+
+  void _moveCurrentToBack() {
+    if (_categories.length <= 1) {
+      return;
+    }
+
+    final current =
+    _categories.removeAt(0);
+
+    _categories.add(current);
+  }
+
+  // ============================================================
+  // PAN START
+  // ============================================================
+
+  void _onPanStart(
+      DragStartDetails details,
+      ) {
+    if (_animating) {
+      return;
+    }
+
+    _dragging = true;
+
+    _dragX = 0;
+    _dragY = 0;
+
+    HapticFeedback.selectionClick();
+  }
+
+  // ============================================================
+  // PAN UPDATE
+  // ============================================================
+
+  void _onPanUpdate(
+      DragUpdateDetails details,
+      ) {
+    if (_animating ||
+        !_dragging) {
+      return;
+    }
+
+    setState(() {
+      _dragX += details.delta.dx;
+      _dragY += details.delta.dy;
+
+      _dragX = _dragX.clamp(
+        -500.0,
+        500.0,
+      );
+
+      _dragY = _dragY.clamp(
+        -500.0,
+        420.0,
+      );
+    });
+  }
+
+  // ============================================================
+  // PAN END
+  // ============================================================
+
+  void _onPanEnd(
+      DragEndDetails details,
+      ) {
+    if (_animating) {
+      return;
+    }
+
+    _dragging = false;
+
+    final velocity =
+        details.velocity.pixelsPerSecond;
+
+    final horizontal =
+    _dragX.abs();
+
+    final vertical =
+    _dragY.abs();
+
+    // ----------------------------------------------------------
+    // HORIZONTAL
+    // ----------------------------------------------------------
+
+    if (horizontal > vertical &&
+        (horizontal > 90 ||
+            velocity.dx.abs() > 650)) {
+      _swipeHorizontal(
+        velocity.dx >= 0 ? 1 : -1,
+      );
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // UP
+    // ----------------------------------------------------------
+
+    if (_dragY < -80 ||
+        velocity.dy < -600) {
+      _swipeUp();
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // DOWN
+    // ----------------------------------------------------------
+
+    if (_dragY > 80 ||
+        velocity.dy > 550) {
+      if (_expanded) {
+        _collapse();
+      } else {
+        _spread();
+      }
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // RESET
+    // ----------------------------------------------------------
+
+    _returnToCenter();
+  }
+
+  // ============================================================
+  // HORIZONTAL SWIPE
+  // ============================================================
+
+  void _swipeHorizontal(
+      int direction,
+      ) {
+    if (_categories.length <= 1) {
+      _returnToCenter();
+      return;
+    }
+
+    _animating = true;
+
+    HapticFeedback.mediumImpact();
+
+    _startX = _dragX;
+
+    _endX =
+        direction *
+            MediaQuery.of(context)
+                .size
+                .width *
+            1.25;
+
+    _startY = _dragY;
+
+    _endY =
+        _dragY - 15;
+
+    _runAnimation(
+      duration:
+      const Duration(
+        milliseconds: 560,
+      ),
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
+
+  // ============================================================
+  // SWIPE UP
+  // ============================================================
+
+  void _swipeUp() {
+    if (_categories.length <= 1) {
+      _returnToCenter();
+      return;
+    }
+
+    _animating = true;
+
+    HapticFeedback.mediumImpact();
+
+    _startX = _dragX;
+
+    _endX =
+        _dragX * .12;
+
+    _startY = _dragY;
+
+    _endY =
+        -MediaQuery.of(context)
+            .size
+            .height *
+            .86;
+
+    _runAnimation(
+      duration:
+      const Duration(
+        milliseconds: 600,
+      ),
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
+
+  // ============================================================
+  // SPREAD
+  // ============================================================
+
+  void _spread() {
+    HapticFeedback.selectionClick();
+
+    _startX = _dragX;
+    _endX = 0;
+
+    _startY = _dragY;
+    _endY = 110;
+
+    _animating = true;
+
+    _runAnimation(
+      duration:
+      const Duration(
+        milliseconds: 520,
+      ),
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
+
+  // ============================================================
+  // COLLAPSE
+  // ============================================================
+
+  void _collapse() {
+    HapticFeedback.selectionClick();
+
+    _startX = _dragX;
+    _endX = 0;
+
+    _startY = _dragY;
+    _endY = 0;
+
+    _animating = true;
+
+    setState(() {
+      _expanded = false;
+    });
+
+    _runAnimation(
+      duration:
+      const Duration(
+        milliseconds: 480,
+      ),
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
+
+  // ============================================================
+  // RETURN
+  // ============================================================
+
+  void _returnToCenter() {
+    _startX = _dragX;
+    _endX = 0;
+
+    _startY = _dragY;
+    _endY = 0;
+
+    _animating = true;
+
+    _runAnimation(
+      duration:
+      const Duration(
+        milliseconds: 350,
+      ),
+      curve:
+      Curves.easeOutCubic,
+    );
+  }
+
+  // ============================================================
+  // RUN ANIMATION
+  // ============================================================
+
+  void _runAnimation({
+    required Duration duration,
+    required Curve curve,
+  }) {
+    _controller
+      ..duration = duration
+      ..reset();
+
+    final curved =
+    CurvedAnimation(
+      parent: _controller,
+      curve: curve,
+    );
+
+    _xAnimation =
+        Tween<double>(
+          begin: _startX,
+          end: _endX,
+        ).animate(curved);
+
+    _yAnimation =
+        Tween<double>(
+          begin: _startY,
+          end: _endY,
+        ).animate(curved);
+
+    _controller.forward();
+  }
+
+  // ============================================================
+  // CARD HEIGHT
+  // ============================================================
+
+  double _cardHeight(
+      BuildContext context,
+      ) {
+    final height =
+        MediaQuery.of(context)
+            .size
+            .height;
+
+    return math.min(
+      height * .62,
+      525.h,
+    );
+  }
+
+  // ============================================================
+  // SPACING
+  // ============================================================
+
+  double _spacing(
+      int depth,
+      ) {
+    final progress =
+    (_dragY / 110)
+        .clamp(
+      0.0,
+      1.0,
+    );
+
+    final eased =
+    Curves.easeOutCubic
+        .transform(
+      progress,
+    );
+
+    return _stackSpacing +
+        ((_spreadSpacing -
+            _stackSpacing) *
+            eased);
+  }
+
+  // ============================================================
+  // TOP
+  // ============================================================
+
+  double _top(
+      int depth,
+      ) {
+    if (depth == 0) {
+      return _dragY;
+    }
+
+    return depth *
+        _spacing(depth) +
+        (_dragY * .06);
+  }
+
+  // ============================================================
+  // SCALE
+  // ============================================================
+
+  double _scale(
+      int depth,
+      ) {
+    if (depth == 0) {
+      final lift =
+      (-_dragY / 200)
+          .clamp(
+        0.0,
+        1.0,
+      );
+
+      return 1 +
+          lift * .025;
+    }
+
+    return (1 -
+        depth * .028)
+        .clamp(
+      .84,
+      1.0,
+    );
+  }
+
+  // ============================================================
+  // ROTATION
+  // ============================================================
+
+  double _rotation(
+      int depth,
+      ) {
+    if (depth != 0) {
+      return 0;
+    }
+
+    return (_dragX / 1150)
+        .clamp(
+      -.05,
+      .05,
+    );
+  }
+
+  // ============================================================
+  // OPACITY
+  // ============================================================
+
+  double _opacity(
+      int depth,
+      ) {
+    if (depth == 0) {
+      return 1;
+    }
+
+    return (1 -
+        depth * .075)
+        .clamp(
+      .56,
+      1,
+    );
   }
 
   // ============================================================
@@ -218,1025 +696,582 @@ class _CategoryScreenState extends State<CategoryScreen>
   Widget build(
       BuildContext context,
       ) {
-    final heights = [
-      360.h,
-      280.h,
-      410.h,
-      315.h,
-    ];
-
     return Scaffold(
       backgroundColor:
-      _background,
+      _background(context),
+      body: FutureBuilder<
+          Map<String, dynamic>>(
+        future: _future,
+        builder: (
+            context,
+            snapshot,
+            ) {
+          if (snapshot.connectionState ==
+              ConnectionState.waiting) {
+            return _loading();
+          }
 
-      body:
-      CustomScrollView(
-        physics:
-        const BouncingScrollPhysics(
-          parent:
-          AlwaysScrollableScrollPhysics(),
-        ),
+          if (snapshot.hasError) {
+            return _error();
+          }
 
-        slivers: [
-          // ========================================================
-          // CINEMATIC HERO
-          // ========================================================
+          if (!snapshot.hasData) {
+            return _loading();
+          }
 
-          SliverAppBar(
-            expandedHeight:
-            510.h,
+          _prepareCategories(
+            snapshot.data!,
+          );
 
-            pinned: true,
-            stretch: true,
+          if (_categories.isEmpty) {
+            return _empty();
+          }
 
-            elevation: 0,
-            scrolledUnderElevation: 0,
+          return _page();
+        },
+      ),
+    );
+  }
 
-            backgroundColor:
-            _background,
+  // ============================================================
+  // PAGE
+  // ============================================================
 
-            automaticallyImplyLeading:
-            false,
+  Widget _page() {
+    final primary =
+    _primary(context);
 
-            leading:
-            Padding(
-              padding:
-              EdgeInsets.all(10.w),
+    final secondary =
+    _secondary(context);
 
-              child:
-              _HeroBackButton(
-                pressed:
-                _backPressed,
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          // ======================================================
+          // HEADER
+          // ======================================================
 
-                accent:
-                _accent,
-
-                onPressedChanged:
-                    (value) {
-                  setState(() {
-                    _backPressed =
-                        value;
-                  });
-                },
-
-                onTap: () {
-                  HapticFeedback
-                      .selectionClick();
-
-                  Navigator.pop(
-                    context,
-                  );
-                },
-              ),
+          Padding(
+            padding:
+            EdgeInsets.fromLTRB(
+              20.w,
+              15.h,
+              20.w,
+              0,
             ),
-
-            flexibleSpace:
-            FlexibleSpaceBar(
-              stretchModes: const [
-                StretchMode
-                    .zoomBackground,
-              ],
-
-              background:
-              Stack(
-                fit:
-                StackFit.expand,
-
-                children: [
-                  // ==================================================
-                  // HERO IMAGE CAROUSEL
-                  // ==================================================
-
-                  if (widget
-                      .wallpapers
-                      .isNotEmpty)
-                    PageView.builder(
-                      controller:
-                      _heroController,
-
-                      physics:
-                      const BouncingScrollPhysics(),
-
-                      itemCount:
-                      widget.wallpapers
-                          .length,
-
-                      onPageChanged:
-                      _onHeroChanged,
-
-                      itemBuilder:
-                          (
-                          context,
-                          index,
-                          ) {
-                        return _AnimatedHeroImage(
-                          image:
-                          widget.wallpapers[
-                          index],
-
-                          animation:
-                          _heroMotionController,
-                        );
-                      },
-                    )
-                  else
-                    Container(
-                      color:
-                      _surface,
-
-                      alignment:
-                      Alignment.center,
-
-                      child:
-                      Icon(
-                        Icons
-                            .wallpaper_rounded,
-
-                        color:
-                        _muted.withOpacity(
-                          .40,
-                        ),
-
-                        size:
-                        80.sp,
-                      ),
-                    ),
-
-                  // ==================================================
-                  // TOP VIGNETTE
-                  // ==================================================
-
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
-                            begin:
-                            Alignment.topCenter,
-
-                            end:
-                            Alignment.center,
-
-                            stops: [
-                              0,
-                              .65,
-                              1,
-                            ],
-
-                            colors: [
-                              Color(
-                                0xA0000000,
-                              ),
-                              Color(
-                                0x20000000,
-                              ),
-                              Colors
-                                  .transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // SIDE VIGNETTE
-                  // ==================================================
-
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
-                            begin:
-                            Alignment.centerLeft,
-
-                            end:
-                            Alignment.centerRight,
-
-                            colors: [
-                              Color(
-                                0x30000000,
-                              ),
-                              Colors
-                                  .transparent,
-                              Color(
-                                0x18000000,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // BOTTOM GRADIENT
-                  // ==================================================
-
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
-                            begin:
-                            Alignment.topCenter,
-
-                            end:
-                            Alignment.bottomCenter,
-
-                            stops: [
-                              0,
-                              .35,
-                              .65,
-                              1,
-                            ],
-
-                            colors: [
-                              Colors
-                                  .transparent,
-
-                              Color(
-                                0x14000000,
-                              ),
-
-                              Color(
-                                0x99000000,
-                              ),
-
-                              Color(
-                                0xF5000000,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // HERO CONTENT
-                  // ==================================================
-
-                  Positioned(
-                    left:
-                    24.w,
-
-                    right:
-                    24.w,
-
-                    bottom:
-                    38.h,
-
-                    child:
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-
-                      children: [
-                        // ------------------------------------------
-                        // LABEL
-                        // ------------------------------------------
-
-                        Row(
-                          children: [
-                            Container(
-                              width:
-                              7.w,
-
-                              height:
-                              7.w,
-
-                              decoration:
-                              BoxDecoration(
-                                color:
-                                _accent,
-
-                                shape:
-                                BoxShape
-                                    .circle,
-                              ),
-                            ),
-
-                            SizedBox(
-                              width:
-                              9.w,
-                            ),
-
-                            Text(
-                              'COLLECTION',
-
-                              style:
-                              GoogleFonts.inter(
-                                color:
-                                Colors.white.withOpacity(
-                                  .70,
-                                ),
-
-                                fontSize:
-                                8.sp,
-
-                                fontWeight:
-                                FontWeight.w800,
-
-                                letterSpacing:
-                                2.2,
-                              ),
-                            ),
-                          ],
-                        )
-                            .animate()
-                            .fadeIn(
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            650,
-                          ),
-                        )
-                            .moveX(
-                          begin:
-                          -18,
-                          end:
-                          0,
-                          curve:
-                          Curves.easeOutExpo,
-                        ),
-
-                        SizedBox(
-                          height:
-                          10.h,
-                        ),
-
-                        // ------------------------------------------
-                        // TITLE
-                        // ------------------------------------------
-
-                        Text(
-                          widget.title
-                              .toUpperCase(),
-
-                          maxLines:
-                          2,
-
-                          overflow:
-                          TextOverflow
-                              .ellipsis,
-
-                          style:
-                          GoogleFonts.bebasNeue(
-                            color:
-                            Colors.white,
-
-                            fontSize:
-                            72.sp,
-
-                            height:
-                            .78,
-
-                            letterSpacing:
-                            2.6,
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(
-                          delay:
-                          const Duration(
-                            milliseconds:
-                            100,
-                          ),
-
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            850,
-                          ),
-                        )
-                            .moveY(
-                          begin:
-                          55,
-                          end:
-                          0,
-
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            900,
-                          ),
-
-                          curve:
-                          Curves.easeOutExpo,
-                        )
-                            .scale(
-                          begin:
-                          const Offset(
-                            .92,
-                            .92,
-                          ),
-
-                          end:
-                          const Offset(
-                            1,
-                            1,
-                          ),
-
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            900,
-                          ),
-
-                          curve:
-                          Curves.easeOutExpo,
-                        ),
-
-                        SizedBox(
-                          height:
-                          10.h,
-                        ),
-
-                        // ------------------------------------------
-                        // DESCRIPTION
-                        // ------------------------------------------
-
-                        Text(
-                          widget.wallpapers
-                              .isEmpty
-                              ? 'No wallpapers available right now.'
-                              : '${widget.wallpapers.length} immersive wallpapers crafted with cinematic visuals and premium minimal aesthetics.',
-
-                          maxLines:
-                          2,
-
-                          overflow:
-                          TextOverflow
-                              .ellipsis,
-
-                          style:
-                          GoogleFonts.inter(
-                            color:
-                            Colors.white.withOpacity(
-                              .68,
-                            ),
-
-                            fontSize:
-                            12.sp,
-
-                            height:
-                            1.6,
-
-                            fontWeight:
-                            FontWeight.w500,
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(
-                          delay:
-                          const Duration(
-                            milliseconds:
-                            300,
-                          ),
-
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            700,
-                          ),
-                        )
-                            .moveY(
-                          begin:
-                          20,
-                          end:
-                          0,
-                          curve:
-                          Curves.easeOutExpo,
-                        ),
-
-                        SizedBox(
-                          height:
-                          18.h,
-                        ),
-
-                        // ------------------------------------------
-                        // META
-                        // ------------------------------------------
-
-                        Row(
-                          children: [
-                            _HeroMeta(
-                              number:
-                              widget.wallpapers
-                                  .length
-                                  .toString()
-                                  .padLeft(
-                                2,
-                                '0',
-                              ),
-
-                              label:
-                              'WALLPAPERS',
-                            ),
-
-                            SizedBox(
-                              width:
-                              20.w,
-                            ),
-
-                            _heroDivider(),
-
-                            SizedBox(
-                              width:
-                              20.w,
-                            ),
-
-                            const _HeroMeta(
-                              number:
-                              '4K',
-
-                              label:
-                              'QUALITY',
-                            ),
-
-                            SizedBox(
-                              width:
-                              20.w,
-                            ),
-
-                            _heroDivider(),
-
-                            SizedBox(
-                              width:
-                              20.w,
-                            ),
-
-                            _HeroMeta(
-                              number:
-                              '${_heroIndex + 1}',
-
-                              label:
-                              'FRAME',
-                            ),
-                          ],
-                        )
-                            .animate()
-                            .fadeIn(
-                          delay:
-                          const Duration(
-                            milliseconds:
-                            450,
-                          ),
-                        )
-                            .moveY(
-                          begin:
-                          18,
-                          end:
-                          0,
-                          curve:
-                          Curves.easeOutExpo,
-                        ),
-
-                        SizedBox(
-                          height:
-                          18.h,
-                        ),
-
-                        // ------------------------------------------
-                        // INDICATOR
-                        // ------------------------------------------
-
-                        _HeroIndicator(
-                          count:
-                          widget.wallpapers
-                              .length,
-
-                          current:
-                          _heroIndex,
-
-                          accent:
-                          _accent,
-                        )
-                            .animate()
-                            .fadeIn(
-                          delay:
-                          const Duration(
-                            milliseconds:
-                            550,
-                          ),
-
-                          duration:
-                          const Duration(
-                            milliseconds:
-                            500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // ========================================================
-          // WALLPAPER HEADER
-          // ========================================================
-
-          SliverToBoxAdapter(
-            child:
-            Padding(
-              padding:
-              EdgeInsets.fromLTRB(
-                22.w,
-                28.h,
-                22.w,
-                22.h,
-              ),
-
-              child:
-              Row(
-                crossAxisAlignment:
-                CrossAxisAlignment
-                    .end,
-
-                children: [
-                  Expanded(
-                    child:
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-
-                      children: [
-                        Text(
-                          'WALLPAPERS',
-
-                          style:
-                          GoogleFonts.bebasNeue(
-                            color:
-                            _primary,
-
-                            fontSize:
-                            42.sp,
-
-                            height:
-                            .82,
-
-                            letterSpacing:
-                            2.6,
-                          ),
-                        ),
-
-                        SizedBox(
-                          height:
-                          8.h,
-                        ),
-
-                        Row(
-                          children: [
-                            Container(
-                              width:
-                              25.w,
-
-                              height:
-                              2,
-
-                              color:
-                              _accent,
-                            ),
-
-                            SizedBox(
-                              width:
-                              9.w,
-                            ),
-
-                            Text(
-                              'THE COLLECTION',
-
-                              style:
-                              GoogleFonts.inter(
-                                color:
-                                _secondary,
-
-                                fontSize:
-                                8.sp,
-
-                                fontWeight:
-                                FontWeight.w800,
-
-                                letterSpacing:
-                                1.7,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  Container(
-                    width:
-                    42.w,
-
-                    height:
-                    42.w,
-
-                    decoration:
-                    BoxDecoration(
-                      color:
-                      _accent.withOpacity(
-                        .08,
-                      ),
-
-                      shape:
-                      BoxShape
-                          .circle,
-
-                      border:
-                      Border.all(
-                        color:
-                        _divider,
-                      ),
-                    ),
-
-                    child:
-                    Center(
-                      child:
+            child: Row(
+              crossAxisAlignment:
+              CrossAxisAlignment.center,
+              children: [
+                _circleButton(
+                  Icons
+                      .arrow_back_ios_new_rounded,
+                      () {
+                    Navigator.pop(
+                      context,
+                    );
+                  },
+                ),
+
+                SizedBox(
+                  width: 14.w,
+                ),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        widget.wallpapers
-                            .length
-                            .toString()
-                            .padLeft(
-                          2,
-                          '0',
-                        ),
-
+                        'DISCOVER',
                         style:
-                        GoogleFonts.inter(
+                        GoogleFonts.manrope(
                           color:
-                          _primary,
-
+                          secondary,
                           fontSize:
-                          10.sp,
-
+                          8.sp,
                           fontWeight:
                           FontWeight.w800,
+                          letterSpacing:
+                          2.3,
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-                .animate()
-                .fadeIn(
-              duration:
-              const Duration(
-                milliseconds:
-                700,
-              ),
-            )
-                .moveY(
-              begin:
-              25,
-              end:
-              0,
-              curve:
-              Curves.easeOutExpo,
-            ),
-          ),
 
-          // ========================================================
-          // EMPTY
-          // ========================================================
-
-          if (widget.wallpapers.isEmpty)
-            SliverFillRemaining(
-              child:
-              _EmptyState(
-                text:
-                _primary,
-
-                secondary:
-                _secondary,
-
-                accent:
-                _accent,
-              ),
-            )
-
-          // ========================================================
-          // GRID
-          // ========================================================
-
-          else
-            SliverPadding(
-              padding:
-              EdgeInsets.symmetric(
-                horizontal:
-                18.w,
-              ),
-
-              sliver:
-              SliverMasonryGrid.count(
-                crossAxisCount:
-                2,
-
-                mainAxisSpacing:
-                14.h,
-
-                crossAxisSpacing:
-                14.w,
-
-                childCount:
-                widget.wallpapers
-                    .length,
-
-                itemBuilder:
-                    (
-                    context,
-                    index,
-                    ) {
-                  final image =
-                  widget.wallpapers[
-                  index];
-
-                  return _CinematicWallpaperCard(
-                    image:
-                    image,
-
-                    index:
-                    index,
-
-                    height:
-                    heights[
-                    index %
-                        4],
-
-                    category:
-                    widget.title,
-
-                    accent:
-                    _accent,
-
-                    onTap: () {
-                      _openPreview(
-                        context,
-                        image,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
-          // ========================================================
-          // END
-          // ========================================================
-
-          SliverToBoxAdapter(
-            child:
-            Padding(
-              padding:
-              EdgeInsets.symmetric(
-                vertical:
-                80.h,
-              ),
-
-              child:
-              Column(
-                children: [
-                  Container(
-                    width:
-                    34.w,
-
-                    height:
-                    1,
-
-                    color:
-                    _divider,
-                  ),
-
-                  SizedBox(
-                    height:
-                    12.h,
-                  ),
-
-                  Text(
-                    'END OF COLLECTION',
-
-                    style:
-                    GoogleFonts.inter(
-                      color:
-                      _muted.withOpacity(
-                        .55,
+                      SizedBox(
+                        height: 3.h,
                       ),
 
-                      fontSize:
-                      8.sp,
+                      Text(
+                        'Atmospheres',
+                        style:
+                        GoogleFonts.bebasNeue(
+                          color:
+                          primary,
+                          fontSize:
+                          31.sp,
+                          height: .8,
+                          letterSpacing:
+                          1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                      fontWeight:
-                      FontWeight.w800,
+                // ------------------------------------------------
+                // CATEGORY COUNTER
+                // ------------------------------------------------
 
-                      letterSpacing:
-                      2.2,
+                Container(
+                  width: 48.w,
+                  height: 48.w,
+                  alignment:
+                  Alignment.center,
+                  decoration:
+                  BoxDecoration(
+                    color:
+                    _accent.withOpacity(
+                      .08,
+                    ),
+                    shape:
+                    BoxShape.circle,
+                    border:
+                    Border.all(
+                      color:
+                      _divider(context),
                     ),
                   ),
+                  child: Text(
+                    _categories.length
+                        .toString()
+                        .padLeft(
+                      2,
+                      '0',
+                    ),
+                    style:
+                    GoogleFonts.manrope(
+                      color:
+                      primary,
+                      fontSize:
+                      10.sp,
+                      fontWeight:
+                      FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(
+            height: 13.h,
+          ),
+
+          // ======================================================
+          // SUB HEADER
+          // ======================================================
+
+          Padding(
+            padding:
+            EdgeInsets.symmetric(
+              horizontal: 20.w,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 24.w,
+                  height: 2,
+                  color: _accent,
+                ),
+
+                SizedBox(
+                  width: 9.w,
+                ),
+
+                Text(
+                  _expanded
+                      ? 'SELECTED ATMOSPHERE'
+                      : 'CURATED COLLECTIONS',
+                  style:
+                  GoogleFonts.manrope(
+                    color:
+                    secondary,
+                    fontSize:
+                    7.5.sp,
+                    fontWeight:
+                    FontWeight.w800,
+                    letterSpacing:
+                    1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(
+            height: 12.h,
+          ),
+
+          // ======================================================
+          // DECK
+          // ======================================================
+
+          Expanded(
+            child: GestureDetector(
+              behavior:
+              HitTestBehavior.opaque,
+              onPanStart:
+              _onPanStart,
+              onPanUpdate:
+              _onPanUpdate,
+              onPanEnd:
+              _onPanEnd,
+              child: Stack(
+                clipBehavior:
+                Clip.none,
+                children: [
+                  for (
+                  int depth =
+                      math.min(
+                        _visibleCards,
+                        _categories.length,
+                      ) -
+                          1;
+                  depth >= 0;
+                  depth--
+                  )
+                    _buildCategoryCard(
+                      depth,
+                    ),
                 ],
               ),
             ),
           ),
+
+          // ======================================================
+          // BOTTOM STATUS
+          // ======================================================
+
+          _bottomStatus(),
         ],
       ),
     );
   }
 
   // ============================================================
-  // OPEN PREVIEW
+  // CATEGORY CARD
   // ============================================================
 
-  void _openPreview(
-      BuildContext context,
-      String image,
+  Widget _buildCategoryCard(
+      int depth,
       ) {
-    HapticFeedback
-        .selectionClick();
+    final item =
+    _categories[depth];
 
-    Navigator.push(
-      context,
+    final category =
+    item.value is Map
+        ? Map<String, dynamic>.from(
+      item.value as Map,
+    )
+        : <String, dynamic>{};
+
+    final thumbnail =
+        category['thumbnail']
+            ?.toString() ??
+            '';
+
+    final raw =
+    category['wallpapers'];
+
+    final wallpapers =
+    raw is List
+        ? raw
+        .map(
+          (e) =>
+          e.toString(),
+    )
+        .where(
+          (e) =>
+      e.isNotEmpty,
+    )
+        .toList()
+        : <String>[];
+
+    final front =
+        depth == 0;
+
+    final height =
+    _cardHeight(context);
+
+    return Positioned(
+      top: _top(depth),
+      left: 20.w,
+      right: 20.w,
+      height: height,
+      child: Transform.scale(
+        scale: _scale(depth),
+        alignment:
+        Alignment.topCenter,
+        child: Transform.rotate(
+          angle: _rotation(depth),
+          alignment:
+          Alignment.bottomCenter,
+          child: Opacity(
+            opacity:
+            _opacity(depth),
+            child:
+            _AtmosphereCard(
+              title: item.key,
+              thumbnail: thumbnail,
+              count:
+              wallpapers.length,
+              index: depth,
+              isFront: front,
+              expanded:
+              _expanded &&
+                  front,
+              dragX:
+              front ? _dragX : 0,
+              dragY:
+              front ? _dragY : 0,
+              height: height,
+              onTap: () {
+                if (!front ||
+                    _animating) {
+                  return;
+                }
+
+                if (!_expanded) {
+                  setState(() {
+                    _expanded = true;
+                  });
+
+                  HapticFeedback
+                      .mediumImpact();
+
+                  return;
+                }
+
+                _openCategory(
+                  item.key,
+                  wallpapers,
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // BOTTOM STATUS
+  // ============================================================
+
+  Widget _bottomStatus() {
+    final primary =
+    _primary(context);
+
+    final secondary =
+    _secondary(context);
+
+    return Padding(
+      padding:
+      EdgeInsets.fromLTRB(
+        20.w,
+        0,
+        20.w,
+        20.h,
+      ),
+      child: AnimatedSwitcher(
+        duration:
+        const Duration(
+          milliseconds: 260,
+        ),
+        child: _expanded
+            ? Row(
+          key:
+          const ValueKey(
+            'expanded',
+          ),
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons
+                  .keyboard_arrow_down_rounded,
+              color:
+              secondary
+                  .withOpacity(
+                .45,
+              ),
+              size: 18.sp,
+            ),
+            Text(
+              ' SWIPE DOWN TO COLLAPSE',
+              style:
+              GoogleFonts.manrope(
+                color:
+                secondary
+                    .withOpacity(
+                  .48,
+                ),
+                fontSize:
+                7.sp,
+                fontWeight:
+                FontWeight.w800,
+                letterSpacing:
+                1.2,
+              ),
+            ),
+          ],
+        )
+            : Row(
+          key:
+          const ValueKey(
+            'collapsed',
+          ),
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons
+                  .keyboard_arrow_left_rounded,
+              color:
+              secondary
+                  .withOpacity(
+                .38,
+              ),
+              size: 17.sp,
+            ),
+            Text(
+              ' SWIPE ',
+              style:
+              GoogleFonts.manrope(
+                color:
+                secondary
+                    .withOpacity(
+                  .45,
+                ),
+                fontSize:
+                7.sp,
+                fontWeight:
+                FontWeight.w800,
+                letterSpacing:
+                1.4,
+              ),
+            ),
+            Icon(
+              Icons
+                  .keyboard_arrow_right_rounded,
+              color:
+              secondary
+                  .withOpacity(
+                .38,
+              ),
+              size: 17.sp,
+            ),
+            SizedBox(
+              width: 12.w,
+            ),
+            Container(
+              width: 1,
+              height: 12.h,
+              color:
+              secondary
+                  .withOpacity(
+                .15,
+              ),
+            ),
+            SizedBox(
+              width: 12.w,
+            ),
+            Icon(
+              Icons
+                  .keyboard_arrow_up_rounded,
+              color:
+              secondary
+                  .withOpacity(
+                .38,
+              ),
+              size: 17.sp,
+            ),
+            Text(
+              ' EXPLORE',
+              style:
+              GoogleFonts.manrope(
+                color:
+                secondary
+                    .withOpacity(
+                  .45,
+                ),
+                fontSize:
+                7.sp,
+                fontWeight:
+                FontWeight.w800,
+                letterSpacing:
+                1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // OPEN CATEGORY
+  // ============================================================
+
+  void _openCategory(
+      String title,
+      List<String> wallpapers,
+      ) {
+    HapticFeedback.selectionClick();
+
+    Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration:
         const Duration(
-          milliseconds:
-          800,
+          milliseconds: 440,
         ),
-
         reverseTransitionDuration:
         const Duration(
-          milliseconds:
-          550,
+          milliseconds: 300,
         ),
-
-        pageBuilder:
-            (
-            _,
+        pageBuilder: (
+            context,
             animation,
-            __,
+            secondaryAnimation,
             ) {
-          return PreviewScreen(
-            imageUrl:
-            image,
-
-            category:
-            widget.title,
+          return CategoryScreen(
+            title: title,
+            wallpapers: wallpapers,
           );
         },
-
-        transitionsBuilder:
-            (
-            _,
+        transitionsBuilder: (
+            context,
             animation,
-            __,
+            secondaryAnimation,
             child,
             ) {
           final curved =
           CurvedAnimation(
-            parent:
-            animation,
-
+            parent: animation,
             curve:
-            Curves.easeOutExpo,
+            Curves.easeOutCubic,
           );
 
           return FadeTransition(
-            opacity:
-            curved,
-
-            child:
-            ScaleTransition(
+            opacity: curved,
+            child: ScaleTransition(
               scale:
               Tween<double>(
-                begin:
-                .94,
-                end:
-                1,
-              ).animate(
-                curved,
-              ),
-
-              child:
-              child,
+                begin: .965,
+                end: 1,
+              ).animate(curved),
+              child: child,
             ),
           );
         },
@@ -1245,1208 +1280,799 @@ class _CategoryScreenState extends State<CategoryScreen>
   }
 
   // ============================================================
-  // HERO DIVIDER
+  // CIRCLE BUTTON
   // ============================================================
 
-  Widget _heroDivider() {
-    return Container(
-      width:
-      1,
-
-      height:
-      25.h,
-
-      color:
-      Colors.white
-          .withOpacity(.18),
-    );
-  }
-}
-
-// ==================================================================
-// ANIMATED HERO IMAGE
-// ==================================================================
-
-class _AnimatedHeroImage
-    extends StatelessWidget {
-  final String image;
-  final Animation<double>
-  animation;
-
-  const _AnimatedHeroImage({
-    required this.image,
-    required this.animation,
-  });
-
-  @override
-  Widget build(
-      BuildContext context,
+  Widget _circleButton(
+      IconData icon,
+      VoidCallback onTap,
       ) {
-    return AnimatedBuilder(
-      animation:
-      animation,
-
-      builder:
-          (
-          context,
-          child,
-          ) {
-        final value =
-        Curves.easeInOut
-            .transform(
-          animation.value,
-        );
-
-        final scale =
-            1.035 +
-                (value * .055);
-
-        final dx =
-            (value - .5) * 10;
-
-        final dy =
-            (value - .5) * 6;
-
-        return Transform.translate(
-          offset:
-          Offset(
-            dx,
-            dy,
-          ),
-
-          child:
-          Transform.scale(
-            scale:
-            scale,
-
-            child:
-            child,
-          ),
-        );
-      },
-
-      child:
-      Image.network(
-        image,
-
-        fit:
-        BoxFit.cover,
-
-        filterQuality:
-        FilterQuality.high,
-
-        errorBuilder:
-            (
-            context,
-            error,
-            stackTrace,
-            ) {
-          final isDark =
-              Theme.of(
-                context,
-              ).brightness ==
-                  Brightness.dark;
-
-          return Container(
-            color:
-            isDark
-                ? AppColors
-                .darkSurface
-                : AppColors
-                .lightSurface,
-
-            alignment:
-            Alignment.center,
-
-            child:
-            Icon(
-              Icons
-                  .broken_image_outlined,
-
-              color:
-              isDark
-                  ? AppColors
-                  .darkMuted
-                  : AppColors
-                  .lightMuted,
-
-              size:
-              60.sp,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==================================================================
-// HERO INDICATOR
-// ==================================================================
-
-class _HeroIndicator
-    extends StatelessWidget {
-  final int count;
-  final int current;
-  final Color accent;
-
-  const _HeroIndicator({
-    required this.count,
-    required this.current,
-    required this.accent,
-  });
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    if (count <= 1) {
-      return const SizedBox
-          .shrink();
-    }
-
-    final visible =
-    count > 7
-        ? 7
-        : count;
-
-    return Row(
-      mainAxisSize:
-      MainAxisSize.min,
-
-      children:
-      List.generate(
-        visible,
-            (index) {
-          final active =
-              index == current;
-
-          return AnimatedContainer(
-            duration:
-            const Duration(
-              milliseconds:
-              650,
-            ),
-
-            curve:
-            Curves.easeOutExpo,
-
-            margin:
-            EdgeInsets.only(
-              right:
-              5.w,
-            ),
-
-            width:
-            active
-                ? 30.w
-                : 6.w,
-
-            height:
-            active
-                ? 4.h
-                : 3.h,
-
-            decoration:
-            BoxDecoration(
-              color:
-              active
-                  ? accent
-                  : Colors.white
-                  .withOpacity(
-                .28,
-              ),
-
-              borderRadius:
-              BorderRadius
-                  .circular(
-                100.r,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==================================================================
-// HERO META
-// ==================================================================
-
-class _HeroMeta
-    extends StatelessWidget {
-  final String number;
-  final String label;
-
-  const _HeroMeta({
-    required this.number,
-    required this.label,
-  });
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment
-          .start,
-
-      children: [
-        Text(
-          number,
-
-          style:
-          GoogleFonts.bebasNeue(
-            color:
-            Colors.white,
-
-            fontSize:
-            24.sp,
-
-            height:
-            .8,
-
-            letterSpacing:
-            1,
-          ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius:
+        BorderRadius.circular(
+          17.r,
         ),
-
-        SizedBox(
-          height:
-          5.h,
-        ),
-
-        Text(
-          label,
-
-          style:
-          GoogleFonts.inter(
-            color:
-            Colors.white
-                .withOpacity(
-              .45,
-            ),
-
-            fontSize:
-            7.sp,
-
-            fontWeight:
-            FontWeight.w800,
-
-            letterSpacing:
-            1.4,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ==================================================================
-// HERO BACK BUTTON
-// ==================================================================
-
-class _HeroBackButton
-    extends StatelessWidget {
-  final bool pressed;
-  final Color accent;
-  final ValueChanged<bool>
-  onPressedChanged;
-  final VoidCallback onTap;
-
-  const _HeroBackButton({
-    required this.pressed,
-    required this.accent,
-    required this.onPressedChanged,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return GestureDetector(
-      onTapDown:
-          (_) {
-        onPressedChanged(
-          true,
-        );
-      },
-
-      onTapCancel:
-          () {
-        onPressedChanged(
-          false,
-        );
-      },
-
-      onTapUp:
-          (_) {
-        onPressedChanged(
-          false,
-        );
-
-        onTap();
-      },
-
-      child:
-      AnimatedScale(
-        scale:
-        pressed
-            ? .86
-            : 1,
-
-        duration:
-        const Duration(
-          milliseconds:
-          170,
-        ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        Container(
-          width:
-          46.w,
-
-          height:
-          46.w,
-
+        child: Ink(
+          width: 48.w,
+          height: 48.w,
           decoration:
           BoxDecoration(
-            shape:
-            BoxShape.circle,
-
             color:
-            Colors.black
-                .withOpacity(
-              .25,
+            _surface(context),
+            borderRadius:
+            BorderRadius.circular(
+              17.r,
             ),
-
             border:
             Border.all(
               color:
-              Colors.white
-                  .withOpacity(
-                .16,
-              ),
+              _divider(context),
             ),
           ),
-
-          child:
-          Icon(
-            Icons
-                .arrow_back_ios_new_rounded,
-
+          child: Icon(
+            icon,
             color:
-            Colors.white,
-
-            size:
-            18.sp,
+            _primary(context),
+            size: 16.sp,
           ),
         ),
       ),
     );
   }
-}
 
-// ==================================================================
-// CINEMATIC WALLPAPER CARD
-// ==================================================================
+  // ============================================================
+  // LOADING
+  // ============================================================
 
-class _CinematicWallpaperCard
-    extends StatefulWidget {
-  final String image;
-  final int index;
-  final double height;
-  final String category;
-  final Color accent;
-  final VoidCallback onTap;
-
-  const _CinematicWallpaperCard({
-    required this.image,
-    required this.index,
-    required this.height,
-    required this.category,
-    required this.accent,
-    required this.onTap,
-  });
-
-  @override
-  State<
-      _CinematicWallpaperCard>
-  createState() =>
-      _CinematicWallpaperCardState();
-}
-
-class _CinematicWallpaperCardState
-    extends State<
-        _CinematicWallpaperCard>
-    with
-        SingleTickerProviderStateMixin {
-  bool _pressed = false;
-
-  late final AnimationController
-  _motionController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _motionController =
-    AnimationController(
-      vsync:
-      this,
-
-      duration:
-      const Duration(
-        seconds:
-        8,
-      ),
-    )..repeat(
-      reverse:
-      true,
-    );
-  }
-
-  @override
-  void dispose() {
-    _motionController.dispose();
-
-    super.dispose();
-  }
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
-    return GestureDetector(
-      onTapDown:
-          (_) {
-        setState(() {
-          _pressed =
-          true;
-        });
-      },
-
-      onTapCancel:
-          () {
-        setState(() {
-          _pressed =
-          false;
-        });
-      },
-
-      onTapUp:
-          (_) {
-        setState(() {
-          _pressed =
-          false;
-        });
-
-        widget.onTap();
-      },
-
-      child:
-      AnimatedScale(
-        scale:
-        _pressed
-            ? .95
-            : 1,
-
-        duration:
-        const Duration(
-          milliseconds:
-          180,
-        ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        Hero(
-          tag:
-          widget.image,
-
-          child:
-          ClipRRect(
-            borderRadius:
-            BorderRadius
-                .circular(
-              34.r,
-            ),
-
-            child:
-            SizedBox(
-              height:
-              widget.height,
-
-              child:
-              Stack(
-                fit:
-                StackFit.expand,
-
-                children: [
-                  // ==================================================
-                  // IMAGE
-                  // ==================================================
-
-                  AnimatedBuilder(
-                    animation:
-                    _motionController,
-
-                    builder:
-                        (
-                        context,
-                        child,
-                        ) {
-                      final value =
-                          _motionController
-                              .value;
-
-                      return Transform
-                          .translate(
-                        offset:
-                        Offset(
-                          (value -
-                              .5) *
-                              7,
-
-                          (value -
-                              .5) *
-                              5,
-                        ),
-
-                        child:
-                        Transform.scale(
-                          scale:
-                          1.045 +
-                              value *
-                                  .045,
-
-                          child:
-                          child,
-                        ),
-                      );
-                    },
-
-                    child:
-                    Image.network(
-                      widget.image,
-
-                      fit:
-                      BoxFit.cover,
-
-                      filterQuality:
-                      FilterQuality
-                          .high,
-
-                      errorBuilder:
-                          (
-                          context,
-                          error,
-                          stackTrace,
-                          ) {
-                        final isDark =
-                            Theme.of(
-                              context,
-                            ).brightness ==
-                                Brightness
-                                    .dark;
-
-                        return Container(
-                          color:
-                          isDark
-                              ? AppColors
-                              .darkSurface
-                              : AppColors
-                              .lightSurface,
-
-                          alignment:
-                          Alignment
-                              .center,
-
-                          child:
-                          Icon(
-                            Icons
-                                .broken_image_outlined,
-
-                            color:
-                            isDark
-                                ? AppColors
-                                .darkMuted
-                                : AppColors
-                                .lightMuted,
-
-                            size:
-                            28.sp,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // ==================================================
-                  // CINEMATIC GRADIENT
-                  // ==================================================
-
-                  const Positioned.fill(
-                    child:
-                    IgnorePointer(
-                      child:
-                      DecoratedBox(
-                        decoration:
-                        BoxDecoration(
-                          gradient:
-                          LinearGradient(
-                            begin:
-                            Alignment.topCenter,
-
-                            end:
-                            Alignment.bottomCenter,
-
-                            stops: [
-                              0,
-                              .30,
-                              .65,
-                              1,
-                            ],
-
-                            colors: [
-                              Color(
-                                0x1A000000,
-                              ),
-                              Colors
-                                  .transparent,
-                              Color(
-                                0x40000000,
-                              ),
-                              Color(
-                                0xF0000000,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // INDEX
-                  // ==================================================
-
-                  Positioned(
-                    top:
-                    17.h,
-
-                    left:
-                    17.w,
-
-                    child:
-                    Row(
-                      children: [
-                        Text(
-                          (widget.index +
-                              1)
-                              .toString()
-                              .padLeft(
-                            2,
-                            '0',
-                          ),
-
-                          style:
-                          GoogleFonts.inter(
-                            color:
-                            Colors.white
-                                .withOpacity(
-                              .72,
-                            ),
-
-                            fontSize:
-                            9.sp,
-
-                            fontWeight:
-                            FontWeight.w800,
-
-                            letterSpacing:
-                            1.8,
-                          ),
-                        ),
-
-                        SizedBox(
-                          width:
-                          8.w,
-                        ),
-
-                        Container(
-                          width:
-                          18.w,
-
-                          height:
-                          1,
-
-                          color:
-                          widget.accent
-                              .withOpacity(
-                            .75,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ==================================================
-                  // ACCENT DOT
-                  // ==================================================
-
-                  Positioned(
-                    top:
-                    18.h,
-
-                    right:
-                    18.w,
-
-                    child:
-                    AnimatedContainer(
-                      duration:
-                      const Duration(
-                        milliseconds:
-                        350,
-                      ),
-
-                      width:
-                      _pressed
-                          ? 10.w
-                          : 7.w,
-
-                      height:
-                      _pressed
-                          ? 10.w
-                          : 7.w,
-
-                      decoration:
-                      BoxDecoration(
-                        color:
-                        widget.accent,
-
-                        shape:
-                        BoxShape
-                            .circle,
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // CONTENT
-                  // ==================================================
-
-                  Positioned(
-                    left:
-                    18.w,
-
-                    right:
-                    18.w,
-
-                    bottom:
-                    18.h,
-
-                    child:
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width:
-                              5.w,
-
-                              height:
-                              5.w,
-
-                              decoration:
-                              BoxDecoration(
-                                color:
-                                widget.accent,
-
-                                shape:
-                                BoxShape
-                                    .circle,
-                              ),
-                            ),
-
-                            SizedBox(
-                              width:
-                              7.w,
-                            ),
-
-                            Expanded(
-                              child:
-                              Text(
-                                '4K • ${widget.category.toUpperCase()}',
-
-                                maxLines:
-                                1,
-
-                                overflow:
-                                TextOverflow
-                                    .ellipsis,
-
-                                style:
-                                GoogleFonts.inter(
-                                  color:
-                                  Colors.white.withOpacity(
-                                    .70,
-                                  ),
-
-                                  fontSize:
-                                  8.sp,
-
-                                  fontWeight:
-                                  FontWeight.w800,
-
-                                  letterSpacing:
-                                  1.1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(
-                          height:
-                          8.h,
-                        ),
-
-                        Text(
-                          'FRAME ${(widget.index + 1).toString().padLeft(2, '0')}',
-
-                          style:
-                          GoogleFonts.bebasNeue(
-                            color:
-                            Colors.white,
-
-                            fontSize:
-                            40.sp,
-
-                            height:
-                            .8,
-
-                            letterSpacing:
-                            1.8,
-                          ),
-                        ),
-
-                        SizedBox(
-                          height:
-                          11.h,
-                        ),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child:
-                              AnimatedContainer(
-                                duration:
-                                const Duration(
-                                  milliseconds:
-                                  450,
-                                ),
-
-                                height:
-                                1,
-
-                                color:
-                                widget.accent.withOpacity(
-                                  _pressed
-                                      ? .75
-                                      : .35,
-                                ),
-                              ),
-                            ),
-
-                            SizedBox(
-                              width:
-                              10.w,
-                            ),
-
-                            AnimatedRotation(
-                              turns:
-                              _pressed
-                                  ? .12
-                                  : 0,
-
-                              duration:
-                              const Duration(
-                                milliseconds:
-                                280,
-                              ),
-
-                              child:
-                              Icon(
-                                Icons
-                                    .arrow_outward_rounded,
-
-                                color:
-                                Colors.white
-                                    .withOpacity(
-                                  .78,
-                                ),
-
-                                size:
-                                15.sp,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      Duration(
-        milliseconds:
-        widget.index *
-            90,
-      ),
-
-      duration:
-      const Duration(
-        milliseconds:
-        900,
-      ),
-    )
-        .moveY(
-      begin:
-      90,
-
-      end:
-      0,
-
-      delay:
-      Duration(
-        milliseconds:
-        widget.index *
-            90,
-      ),
-
-      duration:
-      const Duration(
-        milliseconds:
-        950,
-      ),
-
-      curve:
-      Curves.easeOutExpo,
-    )
-        .scale(
-      begin:
-      const Offset(
-        .90,
-        .90,
-      ),
-
-      end:
-      const Offset(
-        1,
-        1,
-      ),
-
-      duration:
-      const Duration(
-        milliseconds:
-        950,
-      ),
-
-      curve:
-      Curves.easeOutExpo,
-    )
-        .blurXY(
-      begin:
-      4,
-
-      end:
-      0,
-
-      duration:
-      const Duration(
-        milliseconds:
-        800,
-      ),
-    );
-  }
-}
-
-// ==================================================================
-// EMPTY STATE
-// ==================================================================
-
-class _EmptyState
-    extends StatelessWidget {
-  final Color text;
-  final Color secondary;
-  final Color accent;
-
-  const _EmptyState({
-    required this.text,
-    required this.secondary,
-    required this.accent,
-  });
-
-  @override
-  Widget build(
-      BuildContext context,
-      ) {
+  Widget _loading() {
     return Center(
       child:
-      Column(
-        mainAxisAlignment:
-        MainAxisAlignment
-            .center,
+      CircularProgressIndicator(
+        strokeWidth: 1.5,
+        color: _accent,
+      ),
+    );
+  }
 
+  // ============================================================
+  // ERROR
+  // ============================================================
+
+  Widget _error() {
+    return Center(
+      child: Column(
+        mainAxisSize:
+        MainAxisSize.min,
         children: [
-          Container(
-            width:
-            110.w,
-
-            height:
-            110.w,
-
-            decoration:
-            BoxDecoration(
-              shape:
-              BoxShape.circle,
-
-              border:
-              Border.all(
-                color:
-                accent.withOpacity(
-                  .16,
-                ),
-              ),
-
-              color:
-              accent.withOpacity(
-                .04,
-              ),
-            ),
-
-            child:
-            Icon(
-              Icons
-                  .wallpaper_rounded,
-
-              color:
-              accent.withOpacity(
-                .55,
-              ),
-
-              size:
-              42.sp,
-            ),
-          )
-              .animate(
-            onPlay:
-                (controller) =>
-                controller.repeat(
-                  reverse:
-                  true,
-                ),
-          )
-              .scale(
-            begin:
-            const Offset(
-              .94,
-              .94,
-            ),
-
-            end:
-            const Offset(
-              1.04,
-              1.04,
-            ),
-
-            duration:
-            const Duration(
-              milliseconds:
-              1800,
-            ),
-
-            curve:
-            Curves.easeInOut,
+          Icon(
+            Icons
+                .cloud_off_rounded,
+            color: _accent,
+            size: 35.sp,
           ),
-
           SizedBox(
-            height:
-            28.h,
+            height: 14.h,
           ),
-
           Text(
-            'NO WALLPAPERS',
-
+            'UNABLE TO LOAD',
             style:
             GoogleFonts.bebasNeue(
               color:
-              text,
-
+              _primary(context),
               fontSize:
-              34.sp,
-
+              28.sp,
               letterSpacing:
-              2,
+              1.5,
             ),
           ),
-
           SizedBox(
-            height:
-            10.h,
+            height: 15.h,
           ),
-
-          Text(
-            'New wallpapers will appear here soon.',
-
-            style:
-            GoogleFonts.inter(
-              color:
-              secondary,
-
-              fontSize:
-              13.sp,
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _categories.clear();
+                _future =
+                    _fetchCategories();
+              });
+            },
+            child: Container(
+              padding:
+              EdgeInsets.symmetric(
+                horizontal: 20.w,
+                vertical: 11.h,
+              ),
+              decoration:
+              BoxDecoration(
+                color:
+                _accent,
+                borderRadius:
+                BorderRadius.circular(
+                  100.r,
+                ),
+              ),
+              child: Text(
+                'TRY AGAIN',
+                style:
+                GoogleFonts.manrope(
+                  color:
+                  _primary(context),
+                  fontSize:
+                  8.sp,
+                  fontWeight:
+                  FontWeight.w800,
+                  letterSpacing:
+                  1,
+                ),
+              ),
             ),
           ),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds:
-        800,
+    );
+  }
+
+  // ============================================================
+  // EMPTY
+  // ============================================================
+
+  Widget _empty() {
+    return Center(
+      child: Column(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          Icon(
+            Icons
+                .layers_clear_rounded,
+            color: _accent,
+            size: 40.sp,
+          ),
+          SizedBox(
+            height: 14.h,
+          ),
+          Text(
+            'NO ATMOSPHERES',
+            style:
+            GoogleFonts.bebasNeue(
+              color:
+              _primary(context),
+              fontSize:
+              30.sp,
+              letterSpacing:
+              1.5,
+            ),
+          ),
+        ],
       ),
-    )
-        .moveY(
-      begin:
-      30,
+    );
+  }
 
-      end:
-      0,
+  // ============================================================
+  // COLORS
+  // ============================================================
 
-      curve:
-      Curves.easeOutExpo,
+  bool _isDark() {
+    return Theme.of(context)
+        .brightness ==
+        Brightness.dark;
+  }
+
+  Color _background(
+      BuildContext context,
+      ) {
+    return _isDark()
+        ? AppColors.darkBackground
+        : AppColors.lightBackground;
+  }
+
+  Color _surface(
+      BuildContext context,
+      ) {
+    return _isDark()
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
+  }
+
+  Color _surfaceSoft(
+      BuildContext context,
+      ) {
+    return _isDark()
+        ? AppColors.darkSurfaceSoft
+        : AppColors.lightSurfaceSoft;
+  }
+
+  Color _primary(
+      BuildContext context,
+      ) {
+    return _isDark()
+        ? AppColors.darkPrimary
+        : AppColors.lightPrimary;
+  }
+
+  Color _secondary(
+      BuildContext context,
+      ) {
+    return _isDark()
+        ? AppColors.darkSecondary
+        : AppColors.lightSecondary;
+  }
+
+  Color _divider(
+      BuildContext context,
+      ) {
+    return _isDark()
+        ? AppColors.darkDivider
+        : AppColors.lightDivider;
+  }
+
+  Color get _accent =>
+      AppColors.accent;
+}
+
+// ==================================================================
+// ATMOSPHERE CARD
+// ==================================================================
+
+class _AtmosphereCard
+    extends StatelessWidget {
+  final String title;
+  final String thumbnail;
+  final int count;
+  final int index;
+
+  final bool isFront;
+  final bool expanded;
+
+  final double dragX;
+  final double dragY;
+
+  final double height;
+
+  final VoidCallback onTap;
+
+  const _AtmosphereCard({
+    required this.title,
+    required this.thumbnail,
+    required this.count,
+    required this.index,
+    required this.isFront,
+    required this.expanded,
+    required this.dragX,
+    required this.dragY,
+    required this.height,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    final primary =
+    dark
+        ? AppColors.darkPrimary
+        : AppColors.lightPrimary;
+
+    final secondary =
+    dark
+        ? AppColors.darkSecondary
+        : AppColors.lightSecondary;
+
+    final surface =
+    dark
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
+
+    final divider =
+    dark
+        ? AppColors.darkDivider
+        : AppColors.lightDivider;
+
+    final fallback =
+    dark
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
+
+    final imageParallax =
+    isFront
+        ? dragX * .035
+        : 0.0;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius:
+        BorderRadius.circular(
+          34.r,
+        ),
+        child: Container(
+          decoration:
+          BoxDecoration(
+            borderRadius:
+            BorderRadius.circular(
+              34.r,
+            ),
+            border:
+            Border.all(
+              color:
+              primary.withOpacity(
+                isFront
+                    ? .17
+                    : .09,
+              ),
+            ),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // ==================================================
+              // IMAGE
+              // ==================================================
+
+              thumbnail.isEmpty
+                  ? ColoredBox(
+                color: fallback,
+              )
+                  : Transform.translate(
+                offset:
+                Offset(
+                  imageParallax,
+                  dragY * .025,
+                ),
+                child:
+                Image.network(
+                  thumbnail,
+                  fit: BoxFit.cover,
+                  cacheWidth: 1200,
+                  filterQuality:
+                  FilterQuality.medium,
+                  gaplessPlayback:
+                  true,
+                  errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                      ) {
+                    return ColoredBox(
+                      color:
+                      fallback,
+                    );
+                  },
+                ),
+              ),
+
+              // ==================================================
+              // APP COLOR OVERLAY
+              // ==================================================
+
+              Positioned.fill(
+                child:
+                DecoratedBox(
+                  decoration:
+                  BoxDecoration(
+                    gradient:
+                    LinearGradient(
+                      begin:
+                      Alignment.topCenter,
+                      end:
+                      Alignment.bottomCenter,
+                      stops: const [
+                        0,
+                        .30,
+                        .62,
+                        1,
+                      ],
+                      colors: [
+                        surface
+                            .withOpacity(.24),
+                        surface
+                            .withOpacity(.02),
+                        surface
+                            .withOpacity(.20),
+                        surface
+                            .withOpacity(.94),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ==================================================
+              // ACCENT EDGE
+              // ==================================================
+
+              Positioned(
+                left: 0,
+                top: height * .34,
+                child:
+                AnimatedContainer(
+                  duration:
+                  const Duration(
+                    milliseconds: 260,
+                  ),
+                  width:
+                  isFront
+                      ? 4.w
+                      : 2.w,
+                  height:
+                  isFront
+                      ? 55.h
+                      : 35.h,
+                  decoration:
+                  BoxDecoration(
+                    color:
+                    AppColors.accent,
+                    borderRadius:
+                    BorderRadius.only(
+                      topRight:
+                      Radius.circular(
+                        10.r,
+                      ),
+                      bottomRight:
+                      Radius.circular(
+                        10.r,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ==================================================
+              // TOP META
+              // ==================================================
+
+              Positioned(
+                top: 20.h,
+                left: 20.w,
+                right: 20.w,
+                child: Row(
+                  children: [
+                    _MetaPill(
+                      background:
+                      surface
+                          .withOpacity(
+                        .30,
+                      ),
+                      foreground:
+                      primary,
+                      text:
+                      (index + 1)
+                          .toString()
+                          .padLeft(
+                        2,
+                        '0',
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    _MetaPill(
+                      background:
+                      surface
+                          .withOpacity(
+                        .30,
+                      ),
+                      foreground:
+                      primary,
+                      text:
+                      '$count WALLPAPERS',
+                    ),
+                  ],
+                ),
+              ),
+
+              // ==================================================
+              // CENTER EDITORIAL LABEL
+              // ==================================================
+
+              Positioned(
+                top:
+                height * .38,
+                left: 23.w,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 23.w,
+                      height: 2,
+                      color:
+                      AppColors.accent,
+                    ),
+
+                    SizedBox(
+                      width: 8.w,
+                    ),
+
+                    Text(
+                      expanded
+                          ? 'SELECTED'
+                          : 'ATMOSPHERE',
+                      style:
+                      GoogleFonts.manrope(
+                        color:
+                        primary
+                            .withOpacity(
+                          .62,
+                        ),
+                        fontSize:
+                        7.sp,
+                        fontWeight:
+                        FontWeight.w800,
+                        letterSpacing:
+                        1.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ==================================================
+              // BOTTOM
+              // ==================================================
+
+              Positioned(
+                left: 23.w,
+                right: 23.w,
+                bottom: 24.h,
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    // ------------------------------------------------
+                    // TITLE
+                    // ------------------------------------------------
+
+                    AnimatedDefaultTextStyle(
+                      duration:
+                      const Duration(
+                        milliseconds:
+                        300,
+                      ),
+                      curve:
+                      Curves.easeOutCubic,
+                      style:
+                      GoogleFonts.bebasNeue(
+                        color: primary,
+                        fontSize:
+                        expanded
+                            ? 47.sp
+                            : 42.sp,
+                        height: .78,
+                        letterSpacing:
+                        2,
+                      ),
+                      child: Text(
+                        title.toUpperCase(),
+                        maxLines: 2,
+                        overflow:
+                        TextOverflow.ellipsis,
+                      ),
+                    ),
+
+                    SizedBox(
+                      height: 12.h,
+                    ),
+
+                    // ------------------------------------------------
+                    // INFO
+                    // ------------------------------------------------
+
+                    Row(
+                      children: [
+                        Container(
+                          width: 6.w,
+                          height: 6.w,
+                          decoration:
+                          const BoxDecoration(
+                            color:
+                            AppColors.accent,
+                            shape:
+                            BoxShape.circle,
+                          ),
+                        ),
+
+                        SizedBox(
+                          width: 7.w,
+                        ),
+
+                        Text(
+                          '4K COLLECTION',
+                          style:
+                          GoogleFonts.manrope(
+                            color:
+                            secondary
+                                .withOpacity(
+                              .65,
+                            ),
+                            fontSize:
+                            7.sp,
+                            fontWeight:
+                            FontWeight.w800,
+                            letterSpacing:
+                            1.1,
+                          ),
+                        ),
+
+                        SizedBox(
+                          width: 12.w,
+                        ),
+
+                        Container(
+                          width: 1,
+                          height: 10.h,
+                          color:
+                          divider,
+                        ),
+
+                        SizedBox(
+                          width: 12.w,
+                        ),
+
+                        Text(
+                          '$count FRAMES',
+                          style:
+                          GoogleFonts.manrope(
+                            color:
+                            secondary
+                                .withOpacity(
+                              .65,
+                            ),
+                            fontSize:
+                            7.sp,
+                            fontWeight:
+                            FontWeight.w800,
+                            letterSpacing:
+                            1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(
+                      height: 16.h,
+                    ),
+
+                    // ------------------------------------------------
+                    // ACTION ROW
+                    // ------------------------------------------------
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child:
+                          Container(
+                            height: 1,
+                            color:
+                            primary
+                                .withOpacity(
+                              .18,
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(
+                          width: 12.w,
+                        ),
+
+                        AnimatedContainer(
+                          duration:
+                          const Duration(
+                            milliseconds:
+                            260,
+                          ),
+                          width:
+                          expanded
+                              ? 64.w
+                              : 56.w,
+                          height:
+                          expanded
+                              ? 64.w
+                              : 56.w,
+                          decoration:
+                          BoxDecoration(
+                            color:
+                            primary
+                                .withOpacity(
+                              .10,
+                            ),
+                            shape:
+                            BoxShape.circle,
+                            border:
+                            Border.all(
+                              color:
+                              primary
+                                  .withOpacity(
+                                .16,
+                              ),
+                            ),
+                          ),
+                          child: Icon(
+                            expanded
+                                ? Icons
+                                .arrow_forward_rounded
+                                : Icons
+                                .north_east_rounded,
+                            color:
+                            primary,
+                            size:
+                            expanded
+                                ? 25.sp
+                                : 22.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// META PILL
+// ==================================================================
+
+class _MetaPill
+    extends StatelessWidget {
+  final Color background;
+  final Color foreground;
+  final String text;
+
+  const _MetaPill({
+    required this.background,
+    required this.foreground,
+    required this.text,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Container(
+      padding:
+      EdgeInsets.symmetric(
+        horizontal: 10.w,
+        vertical: 7.h,
+      ),
+      decoration:
+      BoxDecoration(
+        color: background,
+        borderRadius:
+        BorderRadius.circular(
+          100.r,
+        ),
+        border:
+        Border.all(
+          color:
+          foreground.withOpacity(
+            .13,
+          ),
+        ),
+      ),
+      child: Text(
+        text,
+        style:
+        GoogleFonts.manrope(
+          color:
+          foreground,
+          fontSize: 7.sp,
+          fontWeight:
+          FontWeight.w800,
+          letterSpacing:
+          .8,
+        ),
+      ),
     );
   }
 }

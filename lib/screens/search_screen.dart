@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:dotty/screens/previewscreen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -18,30 +16,20 @@ class SearchScreen extends StatefulWidget {
   });
 
   @override
-  State<SearchScreen> createState() =>
-      _SearchScreenState();
+  State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState
-    extends State<SearchScreen>
-    with SingleTickerProviderStateMixin {
-  final TextEditingController _controller =
-  TextEditingController();
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  final ScrollController _scrollController = ScrollController();
 
-  final FocusNode _searchFocus =
-  FocusNode();
-
-  late final AnimationController
-  _ambientController;
-
-  List<Map<String, dynamic>> wallpapers =
-  [];
-
-  List<Map<String, dynamic>> filtered =
-  [];
+  List<Map<String, dynamic>> wallpapers = [];
+  List<Map<String, dynamic>> filtered = [];
 
   bool isLoading = true;
   bool hasError = false;
+  bool _searchFocused = false;
 
   final List<double> _cardHeights = [
     345,
@@ -54,29 +42,25 @@ class _SearchScreenState
   void initState() {
     super.initState();
 
-    _ambientController =
-    AnimationController(
-      vsync: this,
-      duration:
-      const Duration(seconds: 10),
-    )..repeat(reverse: true);
+    _controller.addListener(_onSearchChanged);
 
-    _controller.addListener(
-      _onSearchChanged,
-    );
+    _searchFocus.addListener(() {
+      if (!mounted) return;
+
+      setState(() {
+        _searchFocused = _searchFocus.hasFocus;
+      });
+    });
 
     loadData();
   }
 
   @override
   void dispose() {
-    _controller.removeListener(
-      _onSearchChanged,
-    );
-
+    _controller.removeListener(_onSearchChanged);
     _controller.dispose();
     _searchFocus.dispose();
-    _ambientController.dispose();
+    _scrollController.dispose();
 
     super.dispose();
   }
@@ -86,8 +70,7 @@ class _SearchScreenState
   // ============================================================
 
   bool get _isDark =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+      Theme.of(context).brightness == Brightness.dark;
 
   Color get _background =>
       _isDark
@@ -137,18 +120,13 @@ class _SearchScreenState
     }
 
     try {
-      final apiUrl =
-      dotenv.env['API_URL'];
+      final apiUrl = dotenv.env['API_URL'];
 
-      if (apiUrl == null ||
-          apiUrl.trim().isEmpty) {
-        throw Exception(
-          'API_URL is missing',
-        );
+      if (apiUrl == null || apiUrl.trim().isEmpty) {
+        throw Exception('API_URL is missing');
       }
 
-      final response =
-      await http.get(
+      final response = await http.get(
         Uri.parse(apiUrl),
       );
 
@@ -158,38 +136,28 @@ class _SearchScreenState
         );
       }
 
-      final decoded =
-      jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
 
-      final List<
-          Map<String, dynamic>> result =
-      [];
+      final List<Map<String, dynamic>> result = [];
 
       if (decoded is Map &&
           decoded['categories'] is Map) {
         final categories =
-        decoded['categories']
-        as Map;
+        decoded['categories'] as Map;
 
         categories.forEach(
               (category, value) {
             if (value is Map &&
-                value['wallpapers']
-                is List) {
+                value['wallpapers'] is List) {
               final images =
-              value['wallpapers']
-              as List;
+              value['wallpapers'] as List;
 
-              for (final image
-              in images) {
+              for (final image in images) {
                 if (image is String &&
-                    image
-                        .trim()
-                        .isNotEmpty) {
+                    image.trim().isNotEmpty) {
                   result.add({
                     'image': image,
-                    'category':
-                    category.toString(),
+                    'category': category.toString(),
                   });
                 }
               }
@@ -224,8 +192,7 @@ class _SearchScreenState
   // ============================================================
 
   void _onSearchChanged() {
-    final query =
-    _controller.text
+    final query = _controller.text
         .trim()
         .toLowerCase();
 
@@ -239,26 +206,21 @@ class _SearchScreenState
       return;
     }
 
-    final results =
-    wallpapers.where(
+    final results = wallpapers.where(
           (item) {
-        final category =
-        item['category']
+        final category = item['category']
             .toString()
             .toLowerCase();
 
-        final image =
-        item['image']
+        final image = item['image']
             .toString()
             .toLowerCase();
 
-        final name =
-        getWallpaperName(
+        final name = getWallpaperName(
           item['image'].toString(),
         ).toLowerCase();
 
-        return category
-            .contains(query) ||
+        return category.contains(query) ||
             image.contains(query) ||
             name.contains(query);
       },
@@ -276,6 +238,10 @@ class _SearchScreenState
     _searchFocus.unfocus();
   }
 
+  void _openSearch() {
+    _searchFocus.requestFocus();
+  }
+
   // ============================================================
   // BUILD
   // ============================================================
@@ -284,15 +250,21 @@ class _SearchScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
+      resizeToAvoidBottomInset: true,
 
       body: Stack(
         children: [
-          _buildAmbientBackground(),
+          // ------------------------------------------------------
+          // MAIN CONTENT
+          // ------------------------------------------------------
 
           SafeArea(
             child: CustomScrollView(
-              physics:
-              const BouncingScrollPhysics(),
+              controller: _scrollController,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              cacheExtent: 700,
 
               slivers: [
                 SliverToBoxAdapter(
@@ -304,115 +276,19 @@ class _SearchScreenState
                 else if (hasError)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child:
-                    _buildErrorState(),
+                    child: _buildErrorState(),
                   )
                 else if (filtered.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child:
-                      _buildEmptyState(),
+                      child: _buildEmptyState(),
                     )
                   else
                     _buildWallpaperGrid(),
-
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 100.h,
-                  ),
-                ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // AMBIENT BACKGROUND
-  // ============================================================
-
-  Widget _buildAmbientBackground() {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: AnimatedBuilder(
-          animation:
-          _ambientController,
-          builder:
-              (context, child) {
-            final value =
-                _ambientController.value;
-
-            return Stack(
-              children: [
-                Positioned(
-                  top:
-                  -210.h +
-                      (value * 30.h),
-                  right:
-                  -190.w,
-                  child:
-                  _ambientOrb(
-                    410.w,
-                    _isDark
-                        ? .045
-                        : .018,
-                  ),
-                ),
-                Positioned(
-                  top:
-                  410.h -
-                      (value * 25.h),
-                  left:
-                  -190.w,
-                  child:
-                  _ambientOrb(
-                    340.w,
-                    _isDark
-                        ? .025
-                        : .012,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _ambientOrb(
-      double size,
-      double opacity,
-      ) {
-    return Container(
-      width: size,
-      height: size,
-      decoration:
-      BoxDecoration(
-        shape:
-        BoxShape.circle,
-        color:
-        AppColors.accent
-            .withOpacity(
-          opacity,
-        ),
-      ),
-    )
-        .animate(
-      onPlay: (controller) {
-        controller.repeat(
-          reverse: true,
-        );
-      },
-    )
-        .blurXY(
-      begin: 90,
-      end: 125,
-      duration:
-      const Duration(
-        seconds: 8,
       ),
     );
   }
@@ -423,12 +299,11 @@ class _SearchScreenState
 
   Widget _buildHeader() {
     return Padding(
-      padding:
-      EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         20.w,
         18.h,
         20.w,
-        24.h,
+        22.h,
       ),
       child: Column(
         crossAxisAlignment:
@@ -436,80 +311,74 @@ class _SearchScreenState
         children: [
           _buildTopBar(),
 
-          SizedBox(
-            height: 34.h,
+          SizedBox(height: 12.h),
+
+          _buildTopSearch(),
+
+          SizedBox(height: 27.h),
+
+          Row(
+            crossAxisAlignment:
+            CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  'DISCOVER',
+                  style: GoogleFonts.bebasNeue(
+                    color: _primary,
+                    fontSize: 62.sp,
+                    height: .78,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+
+              Container(
+                margin: EdgeInsets.only(
+                  bottom: 5.h,
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 10.w,
+                  vertical: 7.h,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accent
+                      .withOpacity(.10),
+                  borderRadius:
+                  BorderRadius.circular(12.r),
+                  border: Border.all(
+                    color: AppColors.accent
+                        .withOpacity(.22),
+                  ),
+                ),
+                child: Text(
+                  '${filtered.length}',
+                  style: GoogleFonts.manrope(
+                    color: AppColors.accent,
+                    fontSize: 10.sp,
+                    fontWeight:
+                    FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
+
+          SizedBox(height: 10.h),
 
           Text(
-            'SEARCH',
-            style:
-            GoogleFonts.bebasNeue(
-              color: _primary,
-              fontSize: 76.sp,
-              height: .80,
-              letterSpacing: 2.4,
-            ),
-          )
-              .animate()
-              .fadeIn(
-            duration:
-            const Duration(
-              milliseconds: 750,
-            ),
-          )
-              .moveY(
-            begin: 55,
-            end: 0,
-            curve:
-            Curves.easeOutExpo,
-          )
-              .blurXY(
-            begin: 2,
-            end: 0,
-            duration:
-            const Duration(
-              milliseconds: 600,
-            ),
-          ),
-
-          SizedBox(
-            height: 13.h,
-          ),
-
-          Text(
-            'Find the perfect visual for your screen.',
-            style:
-            GoogleFonts.inter(
+            'Find something that feels like you.',
+            style: GoogleFonts.manrope(
               color: _secondary,
               fontSize: 13.sp,
-              height: 1.65,
-              fontWeight:
-              FontWeight.w500,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
             ),
-          )
-              .animate()
-              .fadeIn(
-            delay:
-            const Duration(
-              milliseconds: 160,
-            ),
-          )
-              .moveY(
-            begin: 15,
-            end: 0,
           ),
 
-          SizedBox(
-            height: 23.h,
-          ),
+          SizedBox(height: 22.h),
 
-          _buildSearchBar(),
-
-          SizedBox(
-            height: 17.h,
-          ),
-
-          _buildInfoPills(),
+          _buildQuickFilters(),
         ],
       ),
     );
@@ -522,386 +391,350 @@ class _SearchScreenState
   Widget _buildTopBar() {
     return Row(
       children: [
-        GestureDetector(
-          behavior:
-          HitTestBehavior.opaque,
+        _iconButton(
+          Icons.arrow_back_ios_new_rounded,
           onTap: () {
             Navigator.pop(context);
           },
-          child: _glassCircleButton(
-            Icons
-                .arrow_back_ios_new_rounded,
-          ),
         ),
 
-        SizedBox(
-          width: 14.w,
-        ),
+        SizedBox(width: 12.w),
 
         Expanded(
           child: Row(
             children: [
               Container(
-                width: 6.w,
-                height: 6.w,
+                width: 7.w,
+                height: 7.w,
                 decoration:
                 const BoxDecoration(
-                  shape:
-                  BoxShape.circle,
-                  color:
-                  AppColors.accent,
+                  shape: BoxShape.circle,
+                  color: AppColors.accent,
                 ),
               ),
-              SizedBox(
-                width: 8.w,
-              ),
+
+              SizedBox(width: 8.w),
+
               Text(
-                'DISCOVER COLLECTIONS',
-                style:
-                GoogleFonts.inter(
+                'WALLPAPER LAB',
+                style: GoogleFonts.manrope(
                   color: _secondary,
                   fontSize: 8.sp,
                   fontWeight:
-                  FontWeight.w800,
-                  letterSpacing: 1.5,
+                  FontWeight.w500,
+                  letterSpacing: 1.7,
                 ),
               ),
             ],
           ),
         ),
 
-        _resultCounter(),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 10.w,
+            vertical: 7.h,
+          ),
+          decoration: BoxDecoration(
+            color: _surfaceSoft,
+            borderRadius:
+            BorderRadius.circular(12.r),
+          ),
+          child: Text(
+            '4K',
+            style: GoogleFonts.manrope(
+              color: _primary,
+              fontSize: 8.sp,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
       ],
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds: 550,
-      ),
-    )
-        .moveY(
-      begin: -18,
-      end: 0,
-      curve:
-      Curves.easeOutCubic,
     );
   }
 
-  Widget _glassCircleButton(
-      IconData icon,
-      ) {
-    return ClipRRect(
-      borderRadius:
-      BorderRadius.circular(
-        19.r,
-      ),
-      child: BackdropFilter(
-        filter:
-        ImageFilter.blur(
-          sigmaX: 14,
-          sigmaY: 14,
-        ),
-        child: Container(
-          width: 52.w,
-          height: 52.w,
-          decoration:
-          BoxDecoration(
-            color:
-            _surface.withOpacity(
-              _isDark ? .72 : .88,
-            ),
+  Widget _iconButton(
+      IconData icon, {
+        required VoidCallback onTap,
+      }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius:
+        BorderRadius.circular(17.r),
+        child: Ink(
+          width: 50.w,
+          height: 50.w,
+          decoration: BoxDecoration(
+            color: _surface,
             borderRadius:
-            BorderRadius.circular(
-              19.r,
-            ),
-            border:
-            Border.all(
+            BorderRadius.circular(17.r),
+            border: Border.all(
               color: _divider,
-              width: 1,
             ),
           ),
           child: Icon(
             icon,
             color: _primary,
-            size: 18.sp,
+            size: 17.sp,
           ),
         ),
       ),
     );
   }
 
-  Widget _resultCounter() {
-    return AnimatedContainer(
-      duration:
-      const Duration(
-        milliseconds: 300,
+  // ============================================================
+  // QUICK FILTERS
+  // ============================================================
+
+  Widget _buildQuickFilters() {
+    return SizedBox(
+      height: 38.h,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics:
+        const BouncingScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
+          _quickChip(
+            icon: Icons.auto_awesome_rounded,
+            label: 'ALL',
+            active:
+            _controller.text.isEmpty,
+            onTap: _clearSearch,
+          ),
+
+          SizedBox(width: 8.w),
+
+          _quickChip(
+            icon: Icons.trending_up_rounded,
+            label: 'TRENDING',
+            onTap: () {
+              _controller.text = 'trending';
+            },
+          ),
+
+          SizedBox(width: 8.w),
+
+          _quickChip(
+            icon: Icons.phone_android_rounded,
+            label: 'MOBILE',
+            onTap: () {
+              _controller.text = 'mobile';
+            },
+          ),
+
+          SizedBox(width: 8.w),
+
+          _quickChip(
+            icon: Icons.nightlight_round,
+            label: 'DARK',
+            onTap: () {
+              _controller.text = 'dark';
+            },
+          ),
+        ],
       ),
-      padding:
-      EdgeInsets.symmetric(
-        horizontal: 11.w,
-        vertical: 8.h,
-      ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceSoft,
+    );
+  }
+
+  Widget _quickChip({
+    required IconData icon,
+    required String label,
+    bool active = false,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius:
-        BorderRadius.circular(
-          14.r,
-        ),
-      ),
-      child: Text(
-        '${filtered.length}',
-        style:
-        GoogleFonts.inter(
-          color: _primary,
-          fontSize: 9.sp,
-          fontWeight:
-          FontWeight.w800,
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // SEARCH BAR
-  // ============================================================
-
-  Widget _buildSearchBar() {
-    return ClipRRect(
-      borderRadius:
-      BorderRadius.circular(
-        24.r,
-      ),
-      child: BackdropFilter(
-        filter:
-        ImageFilter.blur(
-          sigmaX: 16,
-          sigmaY: 16,
-        ),
-        child: AnimatedContainer(
-          duration:
-          const Duration(
-            milliseconds: 220,
+        BorderRadius.circular(15.r),
+        child: Ink(
+          padding: EdgeInsets.symmetric(
+            horizontal: 12.w,
           ),
-          height: 60.h,
-          padding:
-          EdgeInsets.symmetric(
-            horizontal: 17.w,
-          ),
-          decoration:
-          BoxDecoration(
-            color:
-            _surface.withOpacity(
-              _isDark ? .82 : .94,
-            ),
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.accent
+                .withOpacity(.12)
+                : _surface,
             borderRadius:
-            BorderRadius.circular(
-              24.r,
-            ),
-            border:
-            Border.all(
-              color: _divider,
+            BorderRadius.circular(15.r),
+            border: Border.all(
+              color: active
+                  ? AppColors.accent
+                  .withOpacity(.30)
+                  : _divider,
             ),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.search_rounded,
-                color: _muted,
-                size: 22.sp,
+                icon,
+                size: 13.sp,
+                color: active
+                    ? AppColors.accent
+                    : _muted,
               ),
 
-              SizedBox(
-                width: 12.w,
-              ),
+              SizedBox(width: 6.w),
 
-              Expanded(
-                child: TextField(
-                  controller:
-                  _controller,
-                  focusNode:
-                  _searchFocus,
-                  textInputAction:
-                  TextInputAction.search,
-                  cursorColor:
-                  AppColors.accent,
-                  style:
-                  GoogleFonts.inter(
-                    color: _primary,
-                    fontSize: 14.sp,
-                    fontWeight:
-                    FontWeight.w600,
-                  ),
-                  decoration:
-                  InputDecoration(
-                    border:
-                    InputBorder.none,
-                    enabledBorder:
-                    InputBorder.none,
-                    focusedBorder:
-                    InputBorder.none,
-                    disabledBorder:
-                    InputBorder.none,
-                    filled: false,
-                    contentPadding:
-                    EdgeInsets.zero,
-                    hintText:
-                    'Search wallpapers...',
-                    hintStyle:
-                    GoogleFonts.inter(
-                      color: _muted,
-                      fontSize: 13.sp,
-                      fontWeight:
-                      FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-
-              AnimatedSwitcher(
-                duration:
-                const Duration(
-                  milliseconds: 180,
-                ),
-                child:
-                _controller
-                    .text
-                    .isNotEmpty
-                    ? GestureDetector(
-                  key:
-                  const ValueKey(
-                    'clear',
-                  ),
-                  onTap:
-                  _clearSearch,
-                  child: Icon(
-                    Icons
-                        .close_rounded,
-                    color:
-                    _muted,
-                    size:
-                    20.sp,
-                  ),
-                )
-                    : const SizedBox(
-                  key:
-                  ValueKey(
-                    'empty',
-                  ),
+              Text(
+                label,
+                style: GoogleFonts.manrope(
+                  color: active
+                      ? AppColors.accent
+                      : _secondary,
+                  fontSize: 8.sp,
+                  fontWeight:
+                  FontWeight.w500,
+                  letterSpacing: .8,
                 ),
               ),
             ],
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      const Duration(
-        milliseconds: 280,
-      ),
-      duration:
-      const Duration(
-        milliseconds: 600,
-      ),
-    )
-        .moveY(
-      begin: 18,
-      end: 0,
-      curve:
-      Curves.easeOutExpo,
     );
   }
 
   // ============================================================
-  // PILLS
+  // BOTTOM SEARCH BAR
   // ============================================================
 
-  Widget _buildInfoPills() {
-    return Row(
-      children: [
-        _pill(
-          Icons.auto_awesome_rounded,
-          'Premium',
-        ),
-        SizedBox(
-          width: 8.w,
-        ),
-        _pill(
-          Icons.high_quality_rounded,
-          '4K',
-        ),
-        SizedBox(
-          width: 8.w,
-        ),
-        _pill(
-          Icons.wallpaper_rounded,
-          '${filtered.length}',
-        ),
-      ],
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      const Duration(
-        milliseconds: 380,
-      ),
-    )
-        .moveY(
-      begin: 12,
-      end: 0,
-    );
-  }
+  Widget _buildTopSearch() {
+    final hasText = _controller.text.isNotEmpty;
 
-  Widget _pill(
-      IconData icon,
-      String label,
-      ) {
-    return Container(
-      padding:
-      EdgeInsets.symmetric(
-        horizontal: 12.w,
-        vertical: 9.h,
-      ),
-      decoration:
-      BoxDecoration(
-        color:
-        _surface.withOpacity(
-          _isDark ? .72 : .86,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      height: _searchFocused ? 58.h : 54.h,
+      padding: EdgeInsets.symmetric(horizontal: 6.w),
+      decoration: BoxDecoration(
+        color: _isDark
+            ? const Color(0xFF171918)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(19.r),
+        border: Border.all(
+          color: _searchFocused
+              ? AppColors.accent.withOpacity(.34)
+              : _divider.withOpacity(.72),
+          width: _searchFocused ? 1.15 : 1,
         ),
-        borderRadius:
-        BorderRadius.circular(
-          16.r,
-        ),
-        border:
-        Border.all(
-          color: _divider,
-          width: 1,
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(
+              _isDark ? .16 : .055,
+            ),
+            blurRadius: _searchFocused ? 25 : 15,
+            offset: const Offset(0, 7),
+          ),
+        ],
       ),
       child: Row(
-        mainAxisSize:
-        MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: _secondary,
-            size: 14.sp,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            width: 42.w,
+            height: 42.w,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(
+                _searchFocused ? .14 : .085,
+              ),
+              borderRadius: BorderRadius.circular(14.r),
+            ),
+            child: Icon(
+              Icons.search_rounded,
+              color: _searchFocused
+                  ? AppColors.accent
+                  : _secondary,
+              size: 19.sp,
+            ),
           ),
-          SizedBox(
-            width: 7.w,
+
+          SizedBox(width: 9.w),
+
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              focusNode: _searchFocus,
+              textInputAction: TextInputAction.search,
+              cursorColor: AppColors.accent,
+              style: GoogleFonts.manrope(
+                color: _primary,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                hintText: 'Search wallpapers',
+                hintStyle: GoogleFonts.manrope(
+                  color: _muted.withOpacity(.82),
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
           ),
-          Text(
-            label,
-            style:
-            GoogleFonts.inter(
-              color: _secondary,
-              fontSize: 9.sp,
-              fontWeight:
-              FontWeight.w700,
+
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return ScaleTransition(
+                scale: animation,
+                child: FadeTransition(
+                  opacity: animation,
+                  child: child,
+                ),
+              );
+            },
+            child: hasText
+                ? Material(
+              key: const ValueKey('clear'),
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _clearSearch,
+                borderRadius: BorderRadius.circular(14.r),
+                child: SizedBox(
+                  width: 40.w,
+                  height: 40.w,
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: _muted,
+                    size: 18.sp,
+                  ),
+                ),
+              ),
+            )
+                : Material(
+              key: const ValueKey('searchAction'),
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _openSearch,
+                borderRadius: BorderRadius.circular(14.r),
+                child: Container(
+                  width: 40.w,
+                  height: 40.w,
+                  decoration: BoxDecoration(
+                    color: _surfaceSoft,
+                    borderRadius: BorderRadius.circular(14.r),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: _secondary,
+                    size: 16.sp,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -915,22 +748,108 @@ class _SearchScreenState
 
   SliverPadding _buildWallpaperGrid() {
     return SliverPadding(
-      padding:
-      EdgeInsets.symmetric(
-        horizontal: 20.w,
+      padding: EdgeInsets.symmetric(
+        horizontal: 16.w,
       ),
-      sliver:
-      SliverMasonryGrid.count(
+
+      sliver: SliverMasonryGrid.count(
         crossAxisCount: 2,
-        mainAxisSpacing: 16.h,
-        crossAxisSpacing: 16.w,
-        childCount:
-        filtered.length,
-        itemBuilder:
-            (context, index) {
-          return _buildWallpaperCard(
-            context,
-            index,
+
+        mainAxisSpacing: 10.h,
+        crossAxisSpacing: 10.w,
+
+        childCount: filtered.length,
+
+        itemBuilder: (context, index) {
+          final item = filtered[index];
+
+          final image =
+          item['image'].toString();
+
+          final category =
+          item['category'].toString();
+
+          return TweenAnimationBuilder<double>(
+            key: ValueKey('entry-$image'),
+            tween: Tween<double>(begin: 0.0, end: 1.0),
+            duration: Duration(
+              milliseconds: 420 + ((index % 6) * 45),
+            ),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 14 * (1 - value)),
+                  child: Transform.scale(
+                    scale: .975 + (.025 * value),
+                    child: child,
+                  ),
+                ),
+              );
+            },
+            child: RepaintBoundary(
+              key: ValueKey(image),
+              child: _WallpaperCard(
+                image: image,
+                category: category,
+                height:
+                _cardHeights[
+                index %
+                    _cardHeights.length]
+                    .h,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      transitionDuration:
+                      const Duration(
+                        milliseconds: 280,
+                      ),
+                      reverseTransitionDuration:
+                      const Duration(
+                        milliseconds: 220,
+                      ),
+                      pageBuilder: (
+                          context,
+                          animation,
+                          secondaryAnimation,
+                          ) {
+                        return PreviewScreen(
+                          imageUrl: image,
+                          category: category,
+                        );
+                      },
+                      transitionsBuilder: (
+                          context,
+                          animation,
+                          secondaryAnimation,
+                          child,
+                          ) {
+                        final curved =
+                        CurvedAnimation(
+                          parent: animation,
+                          curve:
+                          Curves.easeOutCubic,
+                        );
+
+                        return FadeTransition(
+                          opacity: curved,
+                          child: ScaleTransition(
+                            scale:
+                            Tween<double>(
+                              begin: .985,
+                              end: 1,
+                            ).animate(curved),
+                            child: child,
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
           );
         },
       ),
@@ -941,421 +860,313 @@ class _SearchScreenState
   // WALLPAPER CARD
   // ============================================================
 
-  Widget _buildWallpaperCard(
-      BuildContext context,
-      int index,
-      ) {
-    final item =
-    filtered[index];
+  Widget _WallpaperCard({
+    required String image,
+    required String category,
+    required double height,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
 
-    final image =
-    item['image'].toString();
+      child: InkWell(
+        onTap: onTap,
+        borderRadius:
+        BorderRadius.circular(26.r),
 
-    final category =
-    item['category'].toString();
+        child: Ink(
+          height: height,
 
-    final height =
-        _cardHeights[
-        index %
-            _cardHeights.length]
-            .h;
-
-    return GestureDetector(
-      behavior:
-      HitTestBehavior.opaque,
-      onTap: () {
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            transitionDuration:
-            const Duration(
-              milliseconds: 450,
-            ),
-            reverseTransitionDuration:
-            const Duration(
-              milliseconds: 350,
-            ),
-            pageBuilder:
-                (
-                context,
-                animation,
-                secondaryAnimation,
-                ) {
-              return PreviewScreen(
-                imageUrl: image,
-                category:
-                category,
-              );
-            },
-            transitionsBuilder:
-                (
-                context,
-                animation,
-                secondaryAnimation,
-                child,
-                ) {
-              final curve =
-              CurvedAnimation(
-                parent: animation,
-                curve:
-                Curves.easeOutCubic,
-              );
-
-              return FadeTransition(
-                opacity: curve,
-                child:
-                ScaleTransition(
-                  scale:
-                  Tween<double>(
-                    begin: .985,
-                    end: 1,
-                  ).animate(curve),
-                  child: child,
-                ),
-              );
-            },
+          decoration: BoxDecoration(
+            color: _surfaceSoft,
+            borderRadius:
+            BorderRadius.circular(26.r),
           ),
-        );
-      },
-      child: Hero(
-        tag: image,
-        child: ClipRRect(
-          borderRadius:
-          BorderRadius.circular(
-            31.r,
-          ),
-          child: SizedBox(
-            height: height,
+
+          child: ClipRRect(
+            borderRadius:
+            BorderRadius.circular(26.r),
+
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _buildImage(
+                // ------------------------------------------------
+                // IMAGE
+                // ------------------------------------------------
+
+                Image.network(
                   image,
-                  height,
+
+                  width: double.infinity,
+                  height: height,
+
+                  fit: BoxFit.cover,
+
+                  filterQuality:
+                  FilterQuality.medium,
+
+                  cacheWidth: 900,
+
+                  gaplessPlayback: true,
+
+                  errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                      ) {
+                    return Container(
+                      color: _surfaceSoft,
+                      child: Center(
+                        child: Icon(
+                          Icons
+                              .image_not_supported_outlined,
+                          color: _muted,
+                          size: 28.sp,
+                        ),
+                      ),
+                    );
+                  },
                 ),
 
-                _buildCinematicOverlay(),
+                // ------------------------------------------------
+                // DARK OVERLAY
+                // ------------------------------------------------
 
-                _buildCategoryLabel(
-                  category,
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration:
+                    BoxDecoration(
+                      gradient:
+                      LinearGradient(
+                        begin:
+                        Alignment.topCenter,
+                        end:
+                        Alignment.bottomCenter,
+                        stops: [
+                          0.0,
+                          0.45,
+                          1.0,
+                        ],
+                        colors: [
+                          Color(0x05000000),
+                          Color(0x15000000),
+                          Color(0xB8000000),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
 
-                _buildWallpaperInfo(
-                  image,
+                // ------------------------------------------------
+                // CATEGORY
+                // ------------------------------------------------
+
+                Positioned(
+                  top: 12.h,
+                  left: 12.w,
+                  child: Container(
+                    padding:
+                    EdgeInsets.symmetric(
+                      horizontal: 9.w,
+                      vertical: 6.h,
+                    ),
+
+                    decoration:
+                    BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(.30),
+
+                      borderRadius:
+                      BorderRadius.circular(
+                        12.r,
+                      ),
+
+                      border: Border.all(
+                        color: Colors.white
+                            .withOpacity(.12),
+                      ),
+                    ),
+
+                    child: Text(
+                      category.toUpperCase(),
+                      style: GoogleFonts.manrope(
+                        color: Colors.white
+                            .withOpacity(.90),
+                        fontSize: 7.sp,
+                        fontWeight:
+                        FontWeight.w500,
+                        letterSpacing: .9,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ------------------------------------------------
+                // BOTTOM INFORMATION
+                // ------------------------------------------------
+
+                Positioned(
+                  left: 13.w,
+                  right: 13.w,
+                  bottom: 13.h,
+
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          getWallpaperName(
+                            image,
+                          ),
+                          maxLines: 1,
+                          overflow:
+                          TextOverflow.ellipsis,
+
+                          style:
+                          GoogleFonts.manrope(
+                            color: Colors.white,
+                            fontSize: 9.sp,
+                            fontWeight:
+                            FontWeight.w500,
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(width: 8.w),
+
+                      Container(
+                        width: 30.w,
+                        height: 30.w,
+
+                        decoration:
+                        BoxDecoration(
+                          color: Colors.black
+                              .withOpacity(.30),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white
+                                .withOpacity(.12),
+                          ),
+                        ),
+
+                        child: Icon(
+                          Icons
+                              .arrow_outward_rounded,
+                          color: Colors.white
+                              .withOpacity(.90),
+                          size: 12.sp,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      delay:
-      Duration(
-        milliseconds:
-        70 * index,
-      ),
-      duration:
-      const Duration(
-        milliseconds: 700,
-      ),
-    )
-        .moveY(
-      begin: 55,
-      end: 0,
-      duration:
-      const Duration(
-        milliseconds: 700,
-      ),
-      curve:
-      Curves.easeOutExpo,
-    )
-        .scale(
-      begin:
-      const Offset(
-        .96,
-        .96,
-      ),
-      end:
-      const Offset(
-        1,
-        1,
-      ),
-      duration:
-      const Duration(
-        milliseconds: 700,
-      ),
-      curve:
-      Curves.easeOutExpo,
-    )
-        .blurXY(
-      begin: 1.5,
-      end: 0,
-      duration:
-      const Duration(
-        milliseconds: 500,
-      ),
-    );
-  }
-
-  Widget _buildImage(
-      String image,
-      double height,
-      ) {
-    return Image.network(
-      image,
-      width:
-      double.infinity,
-      height: height,
-      fit: BoxFit.cover,
-      filterQuality:
-      FilterQuality.high,
-      errorBuilder:
-          (
-          context,
-          error,
-          stackTrace,
-          ) {
-        return Container(
-          color:
-          _surfaceSoft,
-          child: Center(
-            child: Icon(
-              Icons
-                  .image_not_supported_outlined,
-              color: _muted,
-              size: 30.sp,
-            ),
-          ),
-        );
-      },
     );
   }
 
   // ============================================================
-  // CINEMATIC OVERLAY
-  // ============================================================
-
-  Widget _buildCinematicOverlay() {
-    return Positioned.fill(
-      child: DecoratedBox(
-        decoration:
-        BoxDecoration(
-          gradient:
-          LinearGradient(
-            begin:
-            Alignment.topCenter,
-            end:
-            Alignment.bottomCenter,
-            stops: const [
-              0.0,
-              0.45,
-              0.78,
-              1.0,
-            ],
-            colors: [
-              Colors.black
-                  .withOpacity(.02),
-              Colors.black
-                  .withOpacity(.04),
-              Colors.black
-                  .withOpacity(.28),
-              Colors.black
-                  .withOpacity(.76),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // CATEGORY
-  // ============================================================
-
-  Widget _buildCategoryLabel(
-      String category,
-      ) {
-    return Positioned(
-      top: 15.h,
-      left: 15.w,
-      child: ClipRRect(
-        borderRadius:
-        BorderRadius.circular(
-          14.r,
-        ),
-        child: BackdropFilter(
-          filter:
-          ImageFilter.blur(
-            sigmaX: 10,
-            sigmaY: 10,
-          ),
-          child: Container(
-            padding:
-            EdgeInsets.symmetric(
-              horizontal: 10.w,
-              vertical: 7.h,
-            ),
-            decoration:
-            BoxDecoration(
-              color:
-              Colors.black
-                  .withOpacity(.28),
-              borderRadius:
-              BorderRadius.circular(
-                14.r,
-              ),
-              // IMPORTANT:
-              // No accent/green border.
-              border:
-              Border.all(
-                color: Colors.white
-                    .withOpacity(.10),
-                width: .7,
-              ),
-            ),
-            child: Text(
-              category
-                  .toUpperCase(),
-              style:
-              GoogleFonts.inter(
-                color: Colors.white
-                    .withOpacity(.88),
-                fontSize: 7.5.sp,
-                fontWeight:
-                FontWeight.w800,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // WALLPAPER INFO
-  // ============================================================
-
-  Widget _buildWallpaperInfo(
-      String image,
-      ) {
-    return Positioned(
-      left: 16.w,
-      right: 16.w,
-      bottom: 16.h,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              getWallpaperName(
-                image,
-              ),
-              maxLines: 1,
-              overflow:
-              TextOverflow.ellipsis,
-              style:
-              GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 10.sp,
-                fontWeight:
-                FontWeight.w700,
-              ),
-            ),
-          ),
-
-          SizedBox(
-            width: 10.w,
-          ),
-
-          Container(
-            width: 27.w,
-            height: 27.w,
-            decoration:
-            BoxDecoration(
-              color:
-              Colors.black
-                  .withOpacity(.28),
-              shape:
-              BoxShape.circle,
-              border:
-              Border.all(
-                color: Colors.white
-                    .withOpacity(.12),
-                width: .7,
-              ),
-            ),
-            child: Icon(
-              Icons
-                  .arrow_outward_rounded,
-              color:
-              Colors.white
-                  .withOpacity(.88),
-              size: 12.sp,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // LOADING GRID
+  // LOADING
   // ============================================================
 
   SliverPadding _buildLoadingGrid() {
     return SliverPadding(
-      padding:
-      EdgeInsets.symmetric(
-        horizontal: 20.w,
+      padding: EdgeInsets.symmetric(
+        horizontal: 16.w,
       ),
-      sliver:
-      SliverMasonryGrid.count(
+
+      sliver: SliverMasonryGrid.count(
         crossAxisCount: 2,
-        mainAxisSpacing: 16.h,
-        crossAxisSpacing: 16.w,
+        mainAxisSpacing: 10.h,
+        crossAxisSpacing: 10.w,
         childCount: 6,
-        itemBuilder:
-            (context, index) {
-          return _buildSkeleton(
+
+        itemBuilder: (
+            context,
             index,
+            ) {
+          return _SkeletonCard(
+            height:
+            _cardHeights[
+            index %
+                _cardHeights.length]
+                .h,
           );
         },
       ),
     );
   }
 
-  Widget _buildSkeleton(
-      int index,
-      ) {
-    final height =
-        _cardHeights[
-        index %
-            _cardHeights.length]
-            .h;
+  // ============================================================
+  // SKELETON
+  // ============================================================
 
+  Widget _SkeletonCard({
+    required double height,
+  }) {
     return Container(
       height: height,
-      decoration:
-      BoxDecoration(
-        color:
-        _surfaceSoft,
+
+      decoration: BoxDecoration(
+        color: _surfaceSoft,
         borderRadius:
-        BorderRadius.circular(
-          31.r,
-        ),
+        BorderRadius.circular(26.r),
       ),
-    )
-        .animate(
-      onPlay: (controller) {
-        controller.repeat();
-      },
-    )
-        .shimmer(
-      duration:
-      const Duration(
-        milliseconds: 1500,
+
+      child: Stack(
+        children: [
+          Positioned(
+            left: 13.w,
+            top: 13.h,
+            child: Container(
+              width: 62.w,
+              height: 22.h,
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius:
+                BorderRadius.circular(
+                  10.r,
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 13.w,
+            right: 13.w,
+            bottom: 13.h,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 12.h,
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius:
+                      BorderRadius.circular(
+                        8.r,
+                      ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(width: 8.w),
+
+                Container(
+                  width: 30.w,
+                  height: 30.w,
+                  decoration:
+                  BoxDecoration(
+                    color: _surface,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1367,77 +1178,95 @@ class _SearchScreenState
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding:
-        EdgeInsets.symmetric(
-          horizontal: 40.w,
+        padding: EdgeInsets.symmetric(
+          horizontal: 35.w,
         ),
+
         child: Column(
           mainAxisAlignment:
           MainAxisAlignment.center,
+
           children: [
             Container(
-              width: 78.w,
-              height: 78.w,
-              decoration:
-              BoxDecoration(
-                color:
-                _surfaceSoft,
+              width: 76.w,
+              height: 76.w,
+
+              decoration: BoxDecoration(
+                color: _surfaceSoft,
                 borderRadius:
-                BorderRadius.circular(
-                  26.r,
-                ),
+                BorderRadius.circular(25.r),
               ),
+
               child: Icon(
-                Icons
-                    .search_off_rounded,
+                Icons.search_off_rounded,
                 color: _muted,
-                size: 34.sp,
+                size: 32.sp,
               ),
             ),
 
-            SizedBox(
-              height: 22.h,
-            ),
+            SizedBox(height: 20.h),
 
             Text(
               'NOTHING FOUND',
-              style:
-              GoogleFonts.bebasNeue(
+              style: GoogleFonts.bebasNeue(
                 color: _primary,
                 fontSize: 32.sp,
-                letterSpacing: 1.4,
+                letterSpacing: 1.2,
               ),
             ),
 
-            SizedBox(
-              height: 8.h,
-            ),
+            SizedBox(height: 7.h),
 
             Text(
               'Try another wallpaper name or collection.',
-              textAlign:
-              TextAlign.center,
-              style:
-              GoogleFonts.inter(
+              textAlign: TextAlign.center,
+              style: GoogleFonts.manrope(
                 color: _secondary,
                 fontSize: 12.sp,
                 height: 1.6,
               ),
             ),
+
+            SizedBox(height: 18.h),
+
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _clearSearch,
+                borderRadius:
+                BorderRadius.circular(15.r),
+
+                child: Ink(
+                  padding:
+                  EdgeInsets.symmetric(
+                    horizontal: 17.w,
+                    vertical: 11.h,
+                  ),
+
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius:
+                    BorderRadius.circular(
+                      15.r,
+                    ),
+                  ),
+
+                  child: Text(
+                    'CLEAR SEARCH',
+                    style: GoogleFonts.manrope(
+                      color: Colors.white,
+                      fontSize: 8.sp,
+                      fontWeight:
+                      FontWeight.w500,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds: 600,
-      ),
-    )
-        .moveY(
-      begin: 20,
-      end: 0,
     );
   }
 
@@ -1448,97 +1277,88 @@ class _SearchScreenState
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding:
-        EdgeInsets.symmetric(
-          horizontal: 40.w,
+        padding: EdgeInsets.symmetric(
+          horizontal: 35.w,
         ),
+
         child: Column(
           mainAxisAlignment:
           MainAxisAlignment.center,
+
           children: [
             Container(
-              width: 78.w,
-              height: 78.w,
-              decoration:
-              BoxDecoration(
-                color:
-                _surfaceSoft,
+              width: 76.w,
+              height: 76.w,
+
+              decoration: BoxDecoration(
+                color: _surfaceSoft,
                 borderRadius:
-                BorderRadius.circular(
-                  26.r,
-                ),
+                BorderRadius.circular(25.r),
               ),
+
               child: Icon(
-                Icons
-                    .cloud_off_rounded,
+                Icons.cloud_off_rounded,
                 color: _muted,
-                size: 34.sp,
+                size: 32.sp,
               ),
             ),
 
-            SizedBox(
-              height: 22.h,
-            ),
+            SizedBox(height: 20.h),
 
             Text(
               'UNABLE TO LOAD',
-              style:
-              GoogleFonts.bebasNeue(
+              style: GoogleFonts.bebasNeue(
                 color: _primary,
                 fontSize: 31.sp,
-                letterSpacing: 1.4,
+                letterSpacing: 1.2,
               ),
             ),
 
-            SizedBox(
-              height: 8.h,
-            ),
+            SizedBox(height: 7.h),
 
             Text(
               'Something went wrong while loading the collection.',
-              textAlign:
-              TextAlign.center,
-              style:
-              GoogleFonts.inter(
+              textAlign: TextAlign.center,
+              style: GoogleFonts.manrope(
                 color: _secondary,
                 fontSize: 12.sp,
                 height: 1.6,
               ),
             ),
 
-            SizedBox(
-              height: 22.h,
-            ),
+            SizedBox(height: 20.h),
 
-            GestureDetector(
-              onTap: loadData,
-              child: Container(
-                padding:
-                EdgeInsets.symmetric(
-                  horizontal: 20.w,
-                  vertical: 12.h,
-                ),
-                decoration:
-                BoxDecoration(
-                  color:
-                  AppColors.accent,
-                  borderRadius:
-                  BorderRadius.circular(
-                    17.r,
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: loadData,
+                borderRadius:
+                BorderRadius.circular(15.r),
+
+                child: Ink(
+                  padding:
+                  EdgeInsets.symmetric(
+                    horizontal: 20.w,
+                    vertical: 12.h,
                   ),
-                ),
-                child: Text(
-                  'TRY AGAIN',
-                  style:
-                  GoogleFonts.inter(
-                    color:
-                    Colors.white,
-                    fontSize:
-                    9.sp,
-                    fontWeight:
-                    FontWeight.w800,
-                    letterSpacing:
-                    1.2,
+
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius:
+                    BorderRadius.circular(
+                      15.r,
+                    ),
+                  ),
+
+                  child: Text(
+                    'TRY AGAIN',
+                    style: GoogleFonts.manrope(
+                      color: Colors.white,
+                      fontSize: 9.sp,
+                      fontWeight:
+                      FontWeight.w500,
+                      letterSpacing: 1.1,
+                    ),
                   ),
                 ),
               ),
@@ -1546,22 +1366,11 @@ class _SearchScreenState
           ],
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds: 600,
-      ),
-    )
-        .moveY(
-      begin: 20,
-      end: 0,
     );
   }
 
   // ============================================================
-  // NAME
+  // WALLPAPER NAME
   // ============================================================
 
   String getWallpaperName(
@@ -1570,28 +1379,25 @@ class _SearchScreenState
     String fileName =
         url.split('/').last;
 
-    fileName =
-        fileName.replaceAll(
-          RegExp(
-            r'\.(jpg|jpeg|png|webp)$',
-            caseSensitive: false,
-          ),
-          '',
-        );
+    fileName = fileName.replaceAll(
+      RegExp(
+        r'\.(jpg|jpeg|png|webp)$',
+        caseSensitive: false,
+      ),
+      '',
+    );
 
-    fileName =
-        fileName.replaceAll(
-          RegExp(
-            r'-\d+x\d+-\d+$',
-          ),
-          '',
-        );
+    fileName = fileName.replaceAll(
+      RegExp(
+        r'-\d+x\d+-\d+$',
+      ),
+      '',
+    );
 
-    fileName =
-        fileName.replaceAll(
-          '-',
-          ' ',
-        );
+    fileName = fileName.replaceAll(
+      '-',
+      ' ',
+    );
 
     return fileName
         .split(' ')

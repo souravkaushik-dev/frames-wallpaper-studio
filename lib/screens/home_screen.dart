@@ -7,11 +7,8 @@ import 'package:dotty/screens/previewscreen.dart';
 import 'package:dotty/screens/search_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_hicons/flutter_hicons.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
@@ -22,88 +19,62 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() =>
-      _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState
-    extends State<HomeScreen>
+class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
   // ============================================================
-  // STATE
+  // CONTROLLERS
   // ============================================================
 
-  int currentIndex = 0;
+  late final PageController _featuredController;
+  late final ScrollController _scrollController;
 
-  late Future<Map<String, dynamic>>
-  _dataFuture;
-
-  Timer? _sliderTimer;
-
-  final PageController
-  _heroController =
-  PageController();
-
-  final ScrollController
-  _scrollController =
-  ScrollController();
-
-  double _scrollOffset = 0;
-
-  bool _isUserDraggingHero = false;
+  Timer? _featuredTimer;
 
   // ============================================================
-  // AMBIENT ANIMATION
+  // DATA
   // ============================================================
 
-  late AnimationController
-  _ambientController;
+  late Future<Map<String, dynamic>> _dataFuture;
+
+  int _featuredIndex = 0;
+  bool _isDraggingFeatured = false;
+  bool _sliderStarted = false;
 
   // ============================================================
-  // COLORS
+  // THEME
   // ============================================================
 
   bool get _isDark =>
-      Theme.of(context).brightness ==
-          Brightness.dark;
+      Theme.of(context).brightness == Brightness.dark;
 
-  Color get _background =>
-      _isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground;
+  Color get _background => _isDark
+      ? AppColors.darkBackground
+      : AppColors.lightBackground;
 
-  Color get _surface =>
-      _isDark
-          ? AppColors.darkSurface
-          : AppColors.lightSurface;
+  Color get _surface => _isDark
+      ? AppColors.darkSurface
+      : AppColors.lightSurface;
 
-  Color get _surfaceSoft =>
-      _isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
+  Color get _surfaceSoft => _isDark
+      ? AppColors.darkSurfaceSoft
+      : AppColors.lightSurfaceSoft;
 
-  Color get _primary =>
-      _isDark
-          ? AppColors.darkPrimary
-          : AppColors.lightPrimary;
+  Color get _primary => _isDark
+      ? AppColors.darkPrimary
+      : AppColors.lightPrimary;
 
-  Color get _secondary =>
-      _isDark
-          ? AppColors.darkSecondary
-          : AppColors.lightSecondary;
+  Color get _secondary => _isDark
+      ? AppColors.darkSecondary
+      : AppColors.lightSecondary;
 
-  Color get _muted =>
-      _isDark
-          ? AppColors.darkMuted
-          : AppColors.lightMuted;
+  Color get _muted => _isDark
+      ? AppColors.darkMuted
+      : AppColors.lightMuted;
 
-  Color get _divider =>
-      _isDark
-          ? AppColors.darkDivider
-          : AppColors.lightDivider;
-
-  Color get _accent =>
-      AppColors.accent;
+  Color get _accent => AppColors.accent;
 
   // ============================================================
   // INIT
@@ -113,33 +84,16 @@ class _HomeScreenState
   void initState() {
     super.initState();
 
-    _dataFuture =
-        fetchData();
+    _featuredController = PageController();
 
-    _scrollController
-        .addListener(
-      _onScroll,
-    );
+    _scrollController = ScrollController();
 
-    _ambientController =
-    AnimationController(
-      vsync: this,
-      duration:
-      const Duration(
-        seconds: 12,
-      ),
-    )..repeat(
-      reverse: true,
-    );
+    _dataFuture = fetchData();
 
-    WidgetsBinding.instance
-        .addPostFrameCallback(
-          (_) {
-        if (mounted) {
-          _updateSystemUi();
-        }
-      },
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _updateSystemUi();
+    });
   }
 
   // ============================================================
@@ -148,14 +102,9 @@ class _HomeScreenState
 
   @override
   void dispose() {
-    _sliderTimer?.cancel();
-
-    _heroController.dispose();
-
+    _featuredTimer?.cancel();
+    _featuredController.dispose();
     _scrollController.dispose();
-
-    _ambientController
-        .dispose();
 
     super.dispose();
   }
@@ -166,34 +115,22 @@ class _HomeScreenState
 
   void _updateSystemUi() {
     final dark =
-        Theme.of(context)
-            .brightness ==
-            Brightness.dark;
+        Theme.of(context).brightness == Brightness.dark;
 
-    SystemChrome
-        .setEnabledSystemUIMode(
+    SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.edgeToEdge,
     );
 
-    SystemChrome
-        .setSystemUIOverlayStyle(
+    SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
-        statusBarColor:
-        Colors.transparent,
-        systemNavigationBarColor:
-        Colors.transparent,
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
         statusBarIconBrightness:
-        dark
-            ? Brightness.light
-            : Brightness.dark,
+        dark ? Brightness.light : Brightness.dark,
         statusBarBrightness:
-        dark
-            ? Brightness.dark
-            : Brightness.light,
+        dark ? Brightness.dark : Brightness.light,
         systemNavigationBarIconBrightness:
-        dark
-            ? Brightness.light
-            : Brightness.dark,
+        dark ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor:
         Colors.transparent,
       ),
@@ -201,106 +138,103 @@ class _HomeScreenState
   }
 
   // ============================================================
-  // SCROLL
+  // API
   // ============================================================
 
-  void _onScroll() {
-    if (!mounted) return;
+  Future<Map<String, dynamic>> fetchData() async {
+    final apiUrl = dotenv.env['API_URL'];
 
-    setState(() {
-      _scrollOffset =
-          _scrollController.offset;
-    });
-  }
-
-  // ============================================================
-  // FETCH DATA
-  // ============================================================
-
-  Future<Map<String, dynamic>>
-  fetchData() async {
-    final apiUrl =
-    dotenv.env['API_URL'];
-
-    if (apiUrl == null ||
-        apiUrl.isEmpty) {
+    if (apiUrl == null || apiUrl.isEmpty) {
       throw Exception(
         'API_URL is not configured',
       );
     }
 
-    final res =
-    await http.get(
+    final response = await http.get(
       Uri.parse(apiUrl),
     );
 
-    if (res.statusCode != 200) {
+    if (response.statusCode != 200) {
       throw Exception(
-        'Failed to load wallpapers: ${res.statusCode}',
+        'Failed to load wallpapers: ${response.statusCode}',
       );
     }
 
-    return jsonDecode(
-      res.body,
+    final decoded = jsonDecode(response.body);
+
+    if (decoded is! Map) {
+      throw Exception(
+        'Invalid wallpaper API response',
+      );
+    }
+
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  Future<void> _refresh() async {
+    HapticFeedback.selectionClick();
+
+    _stopFeaturedSlider();
+
+    setState(() {
+      _featuredIndex = 0;
+      _dataFuture = fetchData();
+    });
+
+    await _dataFuture;
+  }
+
+  // ============================================================
+  // FEATURED AUTO SLIDER
+  // ============================================================
+
+  void _startFeaturedSlider(int length) {
+    if (_sliderStarted || length <= 1) {
+      return;
+    }
+
+    _sliderStarted = true;
+
+    _featuredTimer?.cancel();
+
+    _featuredTimer = Timer.periodic(
+      const Duration(seconds: 5),
+          (_) {
+        if (!mounted ||
+            _isDraggingFeatured ||
+            !_featuredController.hasClients) {
+          return;
+        }
+
+        final next =
+            (_featuredIndex + 1) % length;
+
+        _featuredController.animateToPage(
+          next,
+          duration: const Duration(
+            milliseconds: 650,
+          ),
+          curve: Curves.easeOutCubic,
+        );
+      },
     );
   }
 
-  // ============================================================
-  // AUTO SLIDER
-  // ============================================================
-
-  void startAutoSlide(
-      int length,
-      ) {
-    _sliderTimer?.cancel();
-
-    if (length <= 1) return;
-
-    _sliderTimer =
-        Timer.periodic(
-          const Duration(
-            seconds: 5,
-          ),
-              (_) {
-            if (!mounted ||
-                _isUserDraggingHero) {
-              return;
-            }
-
-            final nextIndex =
-                (currentIndex + 1) %
-                    length;
-
-            if (!_heroController
-                .hasClients) {
-              return;
-            }
-
-            _heroController
-                .animateToPage(
-              nextIndex,
-              duration:
-              const Duration(
-                milliseconds: 900,
-              ),
-              curve:
-              Curves.easeOutCubic,
-            );
-          },
-        );
+  void _stopFeaturedSlider() {
+    _featuredTimer?.cancel();
+    _featuredTimer = null;
+    _sliderStarted = false;
   }
 
-  // ============================================================
-  // HERO CHANGE
-  // ============================================================
-
-  void _onHeroChanged(
-      int index,
-      ) {
+  void _onFeaturedChanged(int index) {
     if (!mounted) return;
 
     setState(() {
-      currentIndex = index;
+      _featuredIndex = index;
     });
   }
 
@@ -312,53 +246,156 @@ class _HomeScreenState
       String image, {
         String category = 'Featured',
       }) {
-    Navigator.push(
-      context,
+    Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration:
-        const Duration(
-          milliseconds: 650,
-        ),
+        const Duration(milliseconds: 380),
         reverseTransitionDuration:
-        const Duration(
-          milliseconds: 450,
-        ),
-        pageBuilder:
-            (
-            _,
+        const Duration(milliseconds: 280),
+        pageBuilder: (
+            context,
             animation,
-            __,
+            secondaryAnimation,
             ) {
           return PreviewScreen(
             imageUrl: image,
             category: category,
           );
         },
-        transitionsBuilder:
-            (
-            _,
+        transitionsBuilder: (
+            context,
             animation,
-            __,
+            secondaryAnimation,
             child,
             ) {
-          final curve =
-          CurvedAnimation(
+          final curved = CurvedAnimation(
             parent: animation,
-            curve:
-            Curves.easeOutCubic,
+            curve: Curves.easeOutCubic,
           );
 
           return FadeTransition(
-            opacity: curve,
-            child:
-            ScaleTransition(
-              scale:
-              Tween<double>(
-                begin: .96,
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(
+                begin: .975,
                 end: 1,
-              ).animate(
-                curve,
-              ),
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ============================================================
+  // SEARCH
+  // ============================================================
+
+  void _openSearch() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration:
+        const Duration(milliseconds: 300),
+        reverseTransitionDuration:
+        const Duration(milliseconds: 220),
+        pageBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            ) {
+          return const SearchScreen();
+        },
+        transitionsBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            child,
+            ) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  // ============================================================
+  // PREFERENCES
+  // ============================================================
+
+  void _openPreferences() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration:
+        const Duration(milliseconds: 300),
+        reverseTransitionDuration:
+        const Duration(milliseconds: 220),
+        pageBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            ) {
+          return const PreferencesScreen();
+        },
+        transitionsBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            child,
+            ) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  // ============================================================
+  // CATEGORIES
+  // ============================================================
+
+  void _openCategories() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration:
+        const Duration(milliseconds: 350),
+        reverseTransitionDuration:
+        const Duration(milliseconds: 250),
+        pageBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            ) {
+          return const CategoriesPage();
+        },
+        transitionsBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            child,
+            ) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(.035, 0),
+                end: Offset.zero,
+              ).animate(curved),
               child: child,
             ),
           );
@@ -372,433 +409,64 @@ class _HomeScreenState
   // ============================================================
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
-    final bg = _background;
-    final text = _primary;
-    final secondary = _secondary;
-    final accent = _accent;
-
-    WidgetsBinding.instance
-        .addPostFrameCallback(
-          (_) {
-        if (mounted) {
-          _updateSystemUi();
-        }
-      },
-    );
-
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: _background,
       extendBody: true,
-      extendBodyBehindAppBar: true,
-
-      body: Stack(
-        children: [
-          _buildAmbientBackground(),
-
-          FutureBuilder<
-              Map<String, dynamic>>(
-            future: _dataFuture,
-
-            builder:
-                (
-                context,
-                snapshot,
-                ) {
-              // ==================================================
-              // LOADING
-              // ==================================================
-
-              if (snapshot
-                  .connectionState ==
-                  ConnectionState
-                      .waiting) {
-                return _buildLoading(
-                  bg,
-                );
-              }
-
-              // ==================================================
-              // ERROR
-              // ==================================================
-
-              if (snapshot.hasError) {
-                return _buildError(
-                  text: text,
-                  secondary:
-                  secondary,
-                  bg: bg,
-                );
-              }
-
-              // ==================================================
-              // NO DATA
-              // ==================================================
-
-              if (!snapshot
-                  .hasData) {
-                return _buildLoading(
-                  bg,
-                );
-              }
-
-              final data =
-              snapshot.data!;
-
-              final List<dynamic>
-              trending =
-                  data['trending'] ??
-                      [];
-
-              final Map<String,
-                  dynamic>
-              categories =
-              Map<String,
-                  dynamic>.from(
-                data['categories'] ??
-                    {},
-              );
-
-              if (trending
-                  .isNotEmpty) {
-                WidgetsBinding
-                    .instance
-                    .addPostFrameCallback(
-                      (_) {
-                    if (mounted) {
-                      startAutoSlide(
-                        trending.length,
-                      );
-                    }
-                  },
-                );
-              }
-
-              final String?
-              featuredImage =
-              trending.isNotEmpty
-                  ? trending[
-              currentIndex %
-                  trending
-                      .length]
-                  : null;
-
-              return CustomScrollView(
-                controller:
-                _scrollController,
-
-                physics:
-                const BouncingScrollPhysics(
-                  parent:
-                  AlwaysScrollableScrollPhysics(),
-                ),
-
-                slivers: [
-                  // ==================================================
-                  // HERO
-                  // ==================================================
-
-                  if (featuredImage !=
-                      null)
-                    SliverToBoxAdapter(
-                      child:
-                      _buildHero(
-                        context:
-                        context,
-                        trending:
-                        trending,
-                        featuredImage:
-                        featuredImage,
-                      ),
-                    ),
-
-                  // ==================================================
-                  // CATEGORIES HEADER
-                  // ==================================================
-
-                  SliverToBoxAdapter(
-                    child:
-                    _buildSectionHeader(
-                      title:
-                      'Categories',
-                      subtitle:
-                      'Explore your mood',
-                      text: text,
-                      accent:
-                      accent,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            transitionDuration:
-                            const Duration(
-                              milliseconds:
-                              500,
-                            ),
-                            pageBuilder:
-                                (
-                                _,
-                                animation,
-                                __,
-                                ) {
-                              return const CategoriesPage();
-                            },
-                            transitionsBuilder:
-                                (
-                                _,
-                                animation,
-                                __,
-                                child,
-                                ) {
-                              final curve =
-                              CurvedAnimation(
-                                parent:
-                                animation,
-                                curve:
-                                Curves.easeOutCubic,
-                              );
-
-                              return FadeTransition(
-                                opacity:
-                                curve,
-                                child:
-                                SlideTransition(
-                                  position:
-                                  Tween<Offset>(
-                                    begin:
-                                    const Offset(
-                                      .06,
-                                      .03,
-                                    ),
-                                    end:
-                                    Offset.zero,
-                                  ).animate(
-                                    curve,
-                                  ),
-                                  child:
-                                  child,
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // ==================================================
-                  // CATEGORIES
-                  // ==================================================
-
-                  SliverToBoxAdapter(
-                    child:
-                    _buildCategories(
-                      categories,
-                      text,
-                    ),
-                  ),
-
-                  // ==================================================
-                  // TRENDING HEADER
-                  // ==================================================
-
-                  SliverToBoxAdapter(
-                    child:
-                    Padding(
-                      padding:
-                      EdgeInsets.fromLTRB(
-                        20.w,
-                        44.h,
-                        20.w,
-                        18.h,
-                      ),
-                      child:
-                      Row(
-                        crossAxisAlignment:
-                        CrossAxisAlignment
-                            .end,
-                        children: [
-                          Expanded(
-                            child:
-                            Column(
-                              crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                              children: [
-                                Text(
-                                  'Trending',
-                                  style:
-                                  GoogleFonts.poppins(
-                                    fontSize:
-                                    28.sp,
-                                    fontWeight:
-                                    FontWeight.w800,
-                                    color:
-                                    text,
-                                    height:
-                                    1,
-                                  ),
-                                ),
-                                SizedBox(
-                                  height:
-                                  7.h,
-                                ),
-                                Text(
-                                  'Wallpapers everyone loves',
-                                  style:
-                                  GoogleFonts.inter(
-                                    fontSize:
-                                    13.sp,
-                                    color:
-                                    secondary,
-                                    fontWeight:
-                                    FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          _smallSectionButton(
-                            icon: Icons
-                                .arrow_forward_rounded,
-                            onTap: () {},
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // TRENDING GRID
-                  // ==================================================
-
-                  SliverPadding(
-                    padding:
-                    EdgeInsets.symmetric(
-                      horizontal:
-                      20.w,
-                    ),
-                    sliver:
-                    SliverToBoxAdapter(
-                      child:
-                      MasonryGridView.count(
-                        physics:
-                        const NeverScrollableScrollPhysics(),
-                        shrinkWrap:
-                        true,
-                        crossAxisCount:
-                        2,
-                        mainAxisSpacing:
-                        14.h,
-                        crossAxisSpacing:
-                        14.w,
-                        itemCount:
-                        trending.length,
-                        itemBuilder:
-                            (
-                            context,
-                            index,
-                            ) {
-                          final image =
-                          trending[
-                          index];
-
-                          return _AnimatedWallpaperCard(
-                            image:
-                            image,
-                            index:
-                            index,
-                            onTap: () {
-                              _openPreview(
-                                image,
-                                category:
-                                'Trending',
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-
-                  // ==================================================
-                  // BOTTOM SPACE
-                  // ==================================================
-
-                  SliverToBoxAdapter(
-                    child:
-                    SizedBox(
-                      height:
-                      150.h,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // AMBIENT BACKGROUND
-  // ============================================================
-
-  Widget _buildAmbientBackground() {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child:
-        AnimatedBuilder(
-          animation:
-          _ambientController,
-
-          builder:
-              (
+      body: SafeArea(
+        bottom: false,
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _dataFuture,
+          builder: (
               context,
-              child,
+              snapshot,
               ) {
-            final value =
-                _ambientController
-                    .value;
+            // ------------------------------------------------
+            // LOADING
+            // ------------------------------------------------
 
-            return Stack(
-              children: [
-                Positioned(
-                  top:
-                  -180.h +
-                      value *
-                          30.h,
-                  right:
-                  -190.w +
-                      value *
-                          24.w,
-                  child:
-                  _ambientBlob(
-                    420.w,
-                    _isDark
-                        ? .045
-                        : .014,
-                  ),
-                ),
+            if (snapshot.connectionState ==
+                ConnectionState.waiting) {
+              return _buildLoading();
+            }
 
-                Positioned(
-                  left: -190.w,
-                  top:
-                  380.h -
-                      value *
-                          25.h,
-                  child:
-                  _ambientBlob(
-                    360.w,
-                    _isDark
-                        ? .025
-                        : .010,
-                  ),
-                ),
-              ],
+            // ------------------------------------------------
+            // ERROR
+            // ------------------------------------------------
+
+            if (snapshot.hasError) {
+              return _buildError();
+            }
+
+            // ------------------------------------------------
+            // EMPTY
+            // ------------------------------------------------
+
+            if (!snapshot.hasData) {
+              return _buildLoading();
+            }
+
+            final data = snapshot.data!;
+
+            final List<dynamic> trending =
+            List<dynamic>.from(
+              data['trending'] ?? const [],
+            );
+
+            final Map<String, dynamic> categories =
+            Map<String, dynamic>.from(
+              data['categories'] ?? const {},
+            );
+
+            if (trending.isNotEmpty) {
+              _startFeaturedSlider(
+                trending.length,
+              );
+            }
+
+            return _buildContent(
+              trending: trending,
+              categories: categories,
             );
           },
         ),
@@ -806,1022 +474,588 @@ class _HomeScreenState
     );
   }
 
-  Widget _ambientBlob(
-      double size,
-      double opacity,
-      ) {
-    return Container(
-      width: size,
-      height: size,
-      decoration:
-      BoxDecoration(
-        shape:
-        BoxShape.circle,
-        color:
-        _accent.withOpacity(
-          opacity,
-        ),
-      ),
-    )
-        .animate()
-        .blurXY(
-      begin: 80,
-      end: 115,
-      duration:
-      const Duration(
-        seconds: 8,
-      ),
-    );
-  }
-
   // ============================================================
-  // LOADING
+  // CONTENT
   // ============================================================
 
-  Widget _buildLoading(
-      Color bg,
-      ) {
-    return Container(
-      color: bg,
-      child:
-      Center(
-        child:
-        Column(
-          mainAxisSize:
-          MainAxisSize.min,
-          children: [
-            Container(
-              width: 58.w,
-              height: 58.w,
-
-              decoration:
-              BoxDecoration(
-                borderRadius:
-                BorderRadius
-                    .circular(
-                  20.r,
-                ),
-
-                color:
-                _accent
-                    .withOpacity(
-                  .10,
-                ),
-
-                border:
-                Border.all(
-                  color:
-                  _accent
-                      .withOpacity(
-                    .14,
-                  ),
-                ),
-              ),
-
-              child:
-              Icon(
-                Icons
-                    .auto_awesome_rounded,
-                color:
-                _accent,
-                size:
-                25.sp,
-              ),
-            )
-                .animate(
-              onPlay:
-                  (controller) {
-                controller
-                    .repeat(
-                  reverse:
-                  true,
-                );
-              },
-            )
-                .scale(
-              begin:
-              const Offset(
-                .94,
-                .94,
-              ),
-              end:
-              const Offset(
-                1.04,
-                1.04,
-              ),
-              duration:
-              const Duration(
-                milliseconds:
-                1100,
-              ),
-              curve:
-              Curves.easeInOut,
-            ),
-
-            SizedBox(
-              height: 18.h,
-            ),
-
-            Text(
-              'Loading wallpapers',
-              style:
-              GoogleFonts.inter(
-                color:
-                _secondary,
-                fontSize:
-                13.sp,
-                fontWeight:
-                FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // ERROR
-  // ============================================================
-
-  Widget _buildError({
-    required Color text,
-    required Color secondary,
-    required Color bg,
-  }) {
-    return Container(
-      color: bg,
-
-      alignment:
-      Alignment.center,
-
-      padding:
-      EdgeInsets.all(
-        24.w,
-      ),
-
-      child:
-      Column(
-        mainAxisSize:
-        MainAxisSize.min,
-        children: [
-          Container(
-            width: 72.w,
-            height: 72.w,
-
-            decoration:
-            BoxDecoration(
-              shape:
-              BoxShape.circle,
-              color:
-              _accent
-                  .withOpacity(
-                .10,
-              ),
-              border:
-              Border.all(
-                color:
-                _accent
-                    .withOpacity(
-                  .12,
-                ),
-              ),
-            ),
-
-            child:
-            Icon(
-              Icons
-                  .wifi_off_rounded,
-              color:
-              _accent,
-              size:
-              32.sp,
-            ),
-          ),
-
-          SizedBox(
-            height: 22.h,
-          ),
-
-          Text(
-            'Unable to load wallpapers',
-            textAlign:
-            TextAlign.center,
-            style:
-            GoogleFonts.inter(
-              color:
-              text,
-              fontSize:
-              18.sp,
-              fontWeight:
-              FontWeight.w800,
-            ),
-          ),
-
-          SizedBox(
-            height: 8.h,
-          ),
-
-          Text(
-            'Check your connection and try again.',
-            textAlign:
-            TextAlign.center,
-            style:
-            GoogleFonts.inter(
-              color:
-              secondary,
-              fontSize:
-              13.sp,
-            ),
-          ),
-
-          SizedBox(
-            height: 24.h,
-          ),
-
-          GestureDetector(
-            onTap: () {
-              HapticFeedback
-                  .selectionClick();
-
-              setState(() {
-                _dataFuture =
-                    fetchData();
-              });
-            },
-
-            child:
-            Container(
-              padding:
-              EdgeInsets.symmetric(
-                horizontal:
-                24.w,
-                vertical:
-                13.h,
-              ),
-
-              decoration:
-              BoxDecoration(
-                color:
-                _accent
-                    .withOpacity(
-                  .10,
-                ),
-
-                borderRadius:
-                BorderRadius
-                    .circular(
-                  18.r,
-                ),
-
-                border:
-                Border.all(
-                  color:
-                  _accent
-                      .withOpacity(
-                    .14,
-                  ),
-                ),
-              ),
-
-              child:
-              Text(
-                'Try Again',
-                style:
-                GoogleFonts.inter(
-                  color:
-                  _accent,
-                  fontWeight:
-                  FontWeight.w700,
-                  fontSize:
-                  13.sp,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // HERO
-  // ============================================================
-
-  Widget _buildHero({
-    required BuildContext context,
+  Widget _buildContent({
     required List<dynamic> trending,
-    required String featuredImage,
+    required Map<String, dynamic> categories,
   }) {
-    final screenHeight =
-        MediaQuery.of(context)
-            .size
-            .height;
-
-    final heroHeight =
-        screenHeight * .82;
-
-    return SizedBox(
-      height: heroHeight,
-
-      child:
-      Stack(
-        fit:
-        StackFit.expand,
-
-        children: [
-          // ========================================================
-          // HERO PAGE VIEW
-          // ========================================================
-
-          GestureDetector(
-            onTap: () {
-              _openPreview(
-                featuredImage,
-                category:
-                'Featured',
-              );
-            },
-
-            onPanDown: (_) {
-              _isUserDraggingHero =
-              true;
-            },
-
-            onPanCancel: () {
-              _isUserDraggingHero =
-              false;
-            },
-
-            onPanEnd: (_) {
-              _isUserDraggingHero =
-              false;
-            },
-
-            child:
-            PageView.builder(
-              controller:
-              _heroController,
-
-              itemCount:
-              trending.length,
-
-              onPageChanged:
-              _onHeroChanged,
-
-              physics:
-              const BouncingScrollPhysics(),
-
-              itemBuilder:
-                  (
-                  context,
-                  index,
-                  ) {
-                final image =
-                trending[index];
-
-                return Hero(
-                  tag:
-                  'featured-$image',
-
-                  child:
-                  _HeroWallpaper(
-                    image:
-                    image,
-                    scrollOffset:
-                    _scrollOffset,
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // ========================================================
-          // TOP GRADIENT
-          // ========================================================
-
-          IgnorePointer(
-            child:
-            Container(
-              decoration:
-              const BoxDecoration(
-                gradient:
-                LinearGradient(
-                  begin:
-                  Alignment.topCenter,
-                  end:
-                  Alignment.center,
-                  colors: [
-                    Color(
-                      0xB3000000,
-                    ),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ========================================================
-          // BOTTOM GRADIENT
-          // ========================================================
-
-          IgnorePointer(
-            child:
-            Container(
-              decoration:
-              const BoxDecoration(
-                gradient:
-                LinearGradient(
-                  begin:
-                  Alignment.center,
-                  end:
-                  Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Color(
-                      0x26000000,
-                    ),
-                    Color(
-                      0xE0000000,
-                    ),
-                  ],
-                  stops: [
-                    0,
-                    .55,
-                    1,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ========================================================
+    return RefreshIndicator(
+      color: _accent,
+      backgroundColor: _surface,
+      onRefresh: _refresh,
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(
+          parent:
+          AlwaysScrollableScrollPhysics(),
+        ),
+        cacheExtent: 1000,
+        slivers: [
+          // ==================================================
           // HEADER
-          // ========================================================
+          // ==================================================
 
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-
-            child:
-            SafeArea(
-              bottom:
-              false,
-
-              child:
-              Padding(
-                padding:
-                EdgeInsets.fromLTRB(
-                  20.w,
-                  10.h,
-                  20.w,
-                  0,
-                ),
-
-                child:
-                Row(
-                  children: [
-                    Expanded(
-                      child:
-                      Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width:
-                                8.w,
-                                height:
-                                8.w,
-                                decoration:
-                                const BoxDecoration(
-                                  color:
-                                  Colors.white,
-                                  shape:
-                                  BoxShape.circle,
-                                ),
-                              ),
-
-                              SizedBox(
-                                width:
-                                8.w,
-                              ),
-
-                              Text(
-                                'WALLPAPER STUDIO',
-                                style:
-                                GoogleFonts.inter(
-                                  color:
-                                  Colors.white70,
-                                  fontSize:
-                                  10.sp,
-                                  fontWeight:
-                                  FontWeight.w700,
-                                  letterSpacing:
-                                  2,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          SizedBox(
-                            height:
-                            7.h,
-                          ),
-
-                          Text(
-                            'Frames',
-                            style:
-                            GoogleFonts.poppins(
-                              color:
-                              Colors.white,
-                              fontSize:
-                              32.sp,
-                              height:
-                              .95,
-                              fontWeight:
-                              FontWeight.w800,
-                              letterSpacing:
-                              -1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    _glassIconButton(
-                      icon:
-                      Hicons
-                          .search2LightOutline,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            transitionDuration:
-                            const Duration(
-                              milliseconds:
-                              450,
-                            ),
-                            pageBuilder:
-                                (
-                                _,
-                                animation,
-                                __,
-                                ) {
-                              return const SearchScreen();
-                            },
-                            transitionsBuilder:
-                                (
-                                _,
-                                animation,
-                                __,
-                                child,
-                                ) {
-                              return FadeTransition(
-                                opacity:
-                                CurvedAnimation(
-                                  parent:
-                                  animation,
-                                  curve:
-                                  Curves.easeOutCubic,
-                                ),
-                                child:
-                                child,
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-
-                    SizedBox(
-                      width:
-                      10.w,
-                    ),
-
-                    _glassIconButton(
-                      icon:
-                      Hicons
-                          .filter5LightOutline,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            transitionDuration:
-                            const Duration(
-                              milliseconds:
-                              450,
-                            ),
-                            pageBuilder:
-                                (
-                                _,
-                                animation,
-                                __,
-                                ) {
-                              return const PreferencesScreen();
-                            },
-                            transitionsBuilder:
-                                (
-                                _,
-                                animation,
-                                __,
-                                child,
-                                ) {
-                              return FadeTransition(
-                                opacity:
-                                CurvedAnimation(
-                                  parent:
-                                  animation,
-                                  curve:
-                                  Curves.easeOutCubic,
-                                ),
-                                child:
-                                child,
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          SliverToBoxAdapter(
+            child: _buildHeader(),
           ),
 
-          // ========================================================
-          // HERO CONTENT
-          // ========================================================
+          // ==================================================
+          // SMALL INTRO
+          // ==================================================
 
-          Positioned(
-            left:
-            22.w,
-            right:
-            22.w,
-            bottom:
-            34.h,
-
-            child:
-            Column(
-              crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
-
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding:
-                      EdgeInsets.symmetric(
-                        horizontal:
-                        12.w,
-                        vertical:
-                        7.h,
-                      ),
-
-                      decoration:
-                      BoxDecoration(
-                        color: Colors
-                            .white
-                            .withOpacity(
-                          .12,
-                        ),
-
-                        borderRadius:
-                        BorderRadius
-                            .circular(
-                          30.r,
-                        ),
-
-                        border:
-                        Border.all(
-                          color: Colors
-                              .white
-                              .withOpacity(
-                            .15,
-                          ),
-                        ),
-                      ),
-
-                      child:
-                      Row(
-                        mainAxisSize:
-                        MainAxisSize
-                            .min,
-                        children: [
-                          Icon(
-                            Icons
-                                .auto_awesome_rounded,
-                            color:
-                            Colors.white,
-                            size:
-                            13.sp,
-                          ),
-
-                          SizedBox(
-                            width:
-                            6.w,
-                          ),
-
-                          Text(
-                            'FEATURED',
-                            style:
-                            GoogleFonts.inter(
-                              color:
-                              Colors.white,
-                              fontSize:
-                              10.sp,
-                              fontWeight:
-                              FontWeight.w800,
-                              letterSpacing:
-                              1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    _heroPageIndicator(
-                      trending.length,
-                    ),
-                  ],
-                ),
-
-                SizedBox(
-                  height:
-                  17.h,
-                ),
-
-                AnimatedSwitcher(
-                  duration:
-                  const Duration(
-                    milliseconds:
-                    500,
-                  ),
-
-                  switchInCurve:
-                  Curves.easeOutCubic,
-
-                  transitionBuilder:
-                      (
-                      child,
-                      animation,
-                      ) {
-                    return FadeTransition(
-                      opacity:
-                      animation,
-                      child:
-                      SlideTransition(
-                        position:
-                        Tween<Offset>(
-                          begin:
-                          const Offset(
-                            0,
-                            .12,
-                          ),
-                          end:
-                          Offset.zero,
-                        ).animate(
-                          animation,
-                        ),
-                        child:
-                        child,
-                      ),
-                    );
-                  },
-
-                  child:
-                  Text(
-                    getWallpaperName(
-                      featuredImage,
-                    ),
-                    key:
-                    ValueKey(
-                      featuredImage,
-                    ),
-                    maxLines:
-                    2,
-                    overflow:
-                    TextOverflow
-                        .ellipsis,
-                    style:
-                    GoogleFonts.poppins(
-                      color:
-                      Colors.white,
-                      fontSize:
-                      36.sp,
-                      fontWeight:
-                      FontWeight.w800,
-                      height:
-                      .98,
-                      letterSpacing:
-                      -1.2,
-                    ),
-                  ),
-                ),
-
-                SizedBox(
-                  height:
-                  10.h,
-                ),
-
-                Text(
-                  'Curated wallpapers designed to make your screen feel different.',
-                  maxLines:
-                  2,
-                  overflow:
-                  TextOverflow
-                      .ellipsis,
-                  style:
-                  GoogleFonts.inter(
-                    color:
-                    Colors.white70,
-                    fontSize:
-                    13.sp,
-                    height:
-                    1.45,
-                  ),
-                ),
-
-                SizedBox(
-                  height:
-                  18.h,
-                ),
-              ],
-            ),
+          SliverToBoxAdapter(
+            child: _buildIntro(),
           ),
-        ],
-      ),
-    );
-  }
 
-  // ============================================================
-  // HERO INDICATOR
-  // ============================================================
+          // ==================================================
+          // FEATURED CARD
+          // ==================================================
 
-  Widget _heroPageIndicator(
-      int count,
-      ) {
-    if (count <= 1) {
-      return const SizedBox
-          .shrink();
-    }
-
-    final visibleCount =
-    count > 5 ? 5 : count;
-
-    return RepaintBoundary(
-      child:
-      Row(
-        mainAxisSize:
-        MainAxisSize.min,
-        children:
-        List.generate(
-          visibleCount,
-              (index) {
-            final active =
-                index ==
-                    currentIndex;
-
-            return Padding(
-              padding:
-              EdgeInsets.only(
-                left:
-                5.w,
+          if (trending.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _buildFeatured(
+                trending,
               ),
+            ),
 
-              child:
-              TweenAnimationBuilder<
-                  double>(
-                tween:
-                Tween<double>(
-                  begin:
-                  0,
-                  end:
-                  active
-                      ? 1
-                      : 0,
-                ),
+          // ==================================================
+          // EXPLORE SECTION
+          // ==================================================
 
-                duration:
-                const Duration(
-                  milliseconds:
-                  550,
-                ),
+          if (categories.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _buildExploreHeader(),
+            ),
 
-                curve:
-                Curves.easeOutCubic,
+          // ==================================================
+          // CATEGORIES
+          // ==================================================
 
-                builder:
-                    (
+          if (categories.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _buildCategories(
+                categories,
+              ),
+            ),
+
+          // ==================================================
+          // TRENDING HEADER
+          // ==================================================
+
+          if (trending.length > 1)
+            SliverToBoxAdapter(
+              child: _buildTrendingHeader(),
+            ),
+
+          // ==================================================
+          // TRENDING CARDS
+          // ==================================================
+
+          if (trending.length > 1)
+            SliverPadding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 12.w,
+              ),
+              sliver: SliverList.builder(
+                itemCount: trending.length - 1,
+                itemBuilder: (
                     context,
-                    value,
-                    child,
+                    index,
                     ) {
-                  final width =
-                      6.w +
-                          (16.w *
-                              value);
+                  final realIndex =
+                      index + 1;
 
-                  return Container(
-                    width:
-                    width,
-                    height:
-                    5.h,
+                  final image =
+                  trending[realIndex]
+                      .toString();
 
-                    decoration:
-                    BoxDecoration(
-                      color:
-                      Color.lerp(
-                        Colors
-                            .white
-                            .withOpacity(
-                          .35,
-                        ),
-                        Colors.white,
-                        value,
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: 8.h,
+                    ),
+                    child:
+                    _FeedWallpaperCard(
+                      image: image,
+                      title:
+                      getWallpaperName(
+                        image,
                       ),
-
-                      borderRadius:
-                      BorderRadius
-                          .circular(
-                        100.r,
+                      index: realIndex,
+                      height:
+                      _feedCardHeight(
+                        realIndex,
                       ),
+                      onTap: () {
+                        _openPreview(
+                          image,
+                          category:
+                          'Trending',
+                        );
+                      },
                     ),
                   );
                 },
               ),
-            );
-          },
-        ),
+            ),
+
+          // ==================================================
+          // BOTTOM
+          // ==================================================
+
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 120.h,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // ============================================================
-  // HERO IMAGE
+  // HEADER
   // ============================================================
 
-  Widget _HeroWallpaper({
-    required String image,
-    required double scrollOffset,
-  }) {
-    final double parallax =
-    (scrollOffset * .20)
-        .clamp(
-      0.0,
-      80.0,
-    )
-        .toDouble();
-
-    return ClipRect(
-      child:
-      Transform.translate(
-        offset:
-        Offset(
-          0,
-          parallax,
-        ),
-
-        child:
-        Transform.scale(
-          scale:
-          1.04,
-
-          child:
-          Image.network(
-            image,
-            fit:
-            BoxFit.cover,
-            filterQuality:
-            FilterQuality.high,
-
-            errorBuilder:
-                (
-                context,
-                error,
-                stackTrace,
-                ) {
-              return Container(
-                color:
-                _surfaceSoft,
-                child:
-                Icon(
-                  Icons
-                      .broken_image_outlined,
-                  color:
-                  _muted,
-                  size:
-                  48.sp,
+  Widget _buildHeader() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        18.w,
+        10.h,
+        18.w,
+        0,
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'WALLPAPER STUDIO',
+                  style: GoogleFonts.manrope(
+                    color: _secondary,
+                    fontSize: 8.5.sp,
+                    fontWeight:
+                    FontWeight.w800,
+                    letterSpacing: 1.7,
+                  ),
                 ),
-              );
-            },
+                SizedBox(height: 5.h),
+                Text(
+                  'Frames',
+                  style:
+                  GoogleFonts.bebasNeue(
+                    color: _primary,
+                    fontSize: 30.sp,
+                    fontWeight:
+                    FontWeight.w400,
+                    height: .95,
+                    letterSpacing: -1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          _HeaderButton(
+            icon: Icons.search_rounded,
+            onTap: _openSearch,
+          ),
+
+          SizedBox(width: 7.w),
+
+          _HeaderButton(
+            icon: Icons.tune_rounded,
+            onTap: _openPreferences,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // INTRO
+  // ============================================================
+
+  Widget _buildIntro() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        19.w,
+        20.h,
+        19.w,
+        4.h,
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Text(
+              'Something beautiful\nfor your screen.',
+              style:
+              GoogleFonts.bebasNeue(
+                color: _primary,
+                fontSize: 25.sp,
+                fontWeight:
+                FontWeight.w300,
+                height: .98,
+                letterSpacing: .4,
+              ),
+            ),
+          ),
+
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: 2.h,
+            ),
+            child: Icon(
+              Icons.arrow_downward_rounded,
+              color: _muted,
+              size: 18.sp,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // FEATURED
+  // ============================================================
+
+  Widget _buildFeatured(
+      List<dynamic> trending,
+      ) {
+    final height =
+        MediaQuery.sizeOf(context).height *
+            .57;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        12.w,
+        14.h,
+        12.w,
+        0,
+      ),
+      child: SizedBox(
+        height: height.clamp(
+          390.h,
+          540.h,
+        ),
+        child: ClipRRect(
+          borderRadius:
+          BorderRadius.circular(31.r),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // ============================================
+              // PAGE VIEW
+              // ============================================
+
+              GestureDetector(
+                onPanDown: (_) {
+                  _isDraggingFeatured =
+                  true;
+                },
+                onPanEnd: (_) {
+                  _isDraggingFeatured =
+                  false;
+                },
+                onPanCancel: () {
+                  _isDraggingFeatured =
+                  false;
+                },
+                child: PageView.builder(
+                  controller:
+                  _featuredController,
+                  itemCount:
+                  trending.length,
+                  onPageChanged:
+                  _onFeaturedChanged,
+                  physics:
+                  const BouncingScrollPhysics(),
+                  itemBuilder: (
+                      context,
+                      index,
+                      ) {
+                    final image =
+                    trending[index]
+                        .toString();
+
+                    return Hero(
+                      tag:
+                      'featured-$image',
+                      child:
+                      _FeaturedImage(
+                        image: image,
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // ============================================
+              // IMAGE GRADIENT
+              // ============================================
+
+              const IgnorePointer(
+                child: DecoratedBox(
+                  decoration:
+                  BoxDecoration(
+                    gradient:
+                    LinearGradient(
+                      begin:
+                      Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [
+                        0,
+                        .45,
+                        .72,
+                        1,
+                      ],
+                      colors: [
+                        Color(0x28000000),
+                        Colors.transparent,
+                        Color(0x30000000),
+                        Color(0xE6000000),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ============================================
+              // TOP LABEL
+              // ============================================
+
+              Positioned(
+                top: 16.h,
+                left: 16.w,
+                child: Container(
+                  padding:
+                  EdgeInsets.symmetric(
+                    horizontal: 10.w,
+                    vertical: 6.h,
+                  ),
+                  decoration:
+                  BoxDecoration(
+                    color: Colors.black
+                        .withOpacity(.20),
+                    borderRadius:
+                    BorderRadius.circular(
+                      50.r,
+                    ),
+                    border: Border.all(
+                      color: Colors.white
+                          .withOpacity(.13),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize:
+                    MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5.w,
+                        height: 5.w,
+                        decoration:
+                        const BoxDecoration(
+                          color: Colors.white,
+                          shape:
+                          BoxShape.circle,
+                        ),
+                      ),
+                      SizedBox(width: 6.w),
+                      Text(
+                        'FEATURED',
+                        style:
+                        GoogleFonts.manrope(
+                          color:
+                          Colors.white,
+                          fontSize: 8.sp,
+                          fontWeight:
+                          FontWeight.w800,
+                          letterSpacing:
+                          1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ============================================
+              // PAGE COUNTER
+              // ============================================
+
+              if (trending.length > 1)
+                Positioned(
+                  top: 16.h,
+                  right: 16.w,
+                  child: Container(
+                    padding:
+                    EdgeInsets.symmetric(
+                      horizontal: 10.w,
+                      vertical: 6.h,
+                    ),
+                    decoration:
+                    BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(.20),
+                      borderRadius:
+                      BorderRadius.circular(
+                        50.r,
+                      ),
+                      border: Border.all(
+                        color: Colors.white
+                            .withOpacity(.13),
+                      ),
+                    ),
+                    child: Text(
+                      '${_featuredIndex + 1} / ${trending.length}',
+                      style:
+                      GoogleFonts.manrope(
+                        color: Colors.white,
+                        fontSize: 9.sp,
+                        fontWeight:
+                        FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ============================================
+              // BOTTOM CONTENT
+              // ============================================
+
+              Positioned(
+                left: 19.w,
+                right: 19.w,
+                bottom: 18.h,
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    AnimatedSwitcher(
+                      duration:
+                      const Duration(
+                        milliseconds: 280,
+                      ),
+                      transitionBuilder: (
+                          child,
+                          animation,
+                          ) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child:
+                          SlideTransition(
+                            position:
+                            Tween<
+                                Offset>(
+                              begin:
+                              const Offset(
+                                0,
+                                .08,
+                              ),
+                              end:
+                              Offset.zero,
+                            ).animate(
+                              animation,
+                            ),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Text(
+                        getWallpaperName(
+                          trending[
+                          _featuredIndex %
+                              trending.length
+                          ].toString(),
+                        ),
+                        key: ValueKey(
+                          trending[
+                          _featuredIndex %
+                              trending.length
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow:
+                        TextOverflow
+                            .ellipsis,
+                        style:
+                        GoogleFonts.bebasNeue(
+                          color:
+                          Colors.white,
+                          fontSize: 29.sp,
+                          fontWeight:
+                          FontWeight.w400,
+                          height: .94,
+                          letterSpacing:
+                          -1,
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 7.h),
+
+                    Text(
+                      'Tap to explore this wallpaper',
+                      style:
+                      GoogleFonts.manrope(
+                        color: Colors.white
+                            .withOpacity(.65),
+                        fontSize: 10.sp,
+                        fontWeight:
+                        FontWeight.w500,
+                      ),
+                    ),
+
+                    SizedBox(height: 13.h),
+
+                    _FeaturedIndicator(
+                      count: trending.length,
+                      current:
+                      _featuredIndex,
+                    ),
+                  ],
+                ),
+              ),
+
+              // ============================================
+              // TAP OVERLAY
+              // ============================================
+
+              Positioned.fill(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius:
+                    BorderRadius.circular(
+                      31.r,
+                    ),
+                    onTap: () {
+                      final image =
+                      trending[
+                      _featuredIndex %
+                          trending.length
+                      ].toString();
+
+                      _openPreview(
+                        image,
+                        category:
+                        'Featured',
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1829,68 +1063,44 @@ class _HomeScreenState
   }
 
   // ============================================================
-  // SECTION HEADER
+  // EXPLORE HEADER
   // ============================================================
 
-  Widget _buildSectionHeader({
-    required String title,
-    required String subtitle,
-    required Color text,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildExploreHeader() {
     return Padding(
-      padding:
-      EdgeInsets.fromLTRB(
-        20.w,
-        42.h,
-        20.w,
-        18.h,
+      padding: EdgeInsets.fromLTRB(
+        19.w,
+        32.h,
+        19.w,
+        14.h,
       ),
-
-      child:
-      Row(
+      child: Row(
         crossAxisAlignment:
-        CrossAxisAlignment
-            .end,
-
+        CrossAxisAlignment.end,
         children: [
           Expanded(
-            child:
-            Column(
+            child: Column(
               crossAxisAlignment:
-              CrossAxisAlignment
-                  .start,
-
+              CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  'Explore',
                   style:
-                  GoogleFonts.poppins(
-                    fontSize:
-                    28.sp,
+                  GoogleFonts.bebasNeue(
+                    color: _primary,
+                    fontSize: 24.sp,
                     fontWeight:
-                    FontWeight.w800,
-                    color:
-                    text,
-                    height:
-                    1,
+                    FontWeight.w400,
+                    height: 1,
+                    letterSpacing: -.5,
                   ),
                 ),
-
-                SizedBox(
-                  height:
-                  7.h,
-                ),
-
+                SizedBox(height: 5.h),
                 Text(
-                  subtitle,
-                  style:
-                  GoogleFonts.inter(
-                    fontSize:
-                    13.sp,
-                    color:
-                    _secondary,
+                  'Find something that feels like you',
+                  style: GoogleFonts.manrope(
+                    color: _secondary,
+                    fontSize: 11.sp,
                     fontWeight:
                     FontWeight.w500,
                   ),
@@ -1899,84 +1109,56 @@ class _HomeScreenState
             ),
           ),
 
+          // ================================================
+          // ROUNDED PILL
+          // ================================================
+
           GestureDetector(
             onTap: () {
-              HapticFeedback
-                  .selectionClick();
-
-              onTap();
+              HapticFeedback.selectionClick();
+              _openCategories();
             },
-
-            child:
-            AnimatedContainer(
-              duration:
-              const Duration(
-                milliseconds:
-                220,
-              ),
-
+            child: Container(
               padding:
               EdgeInsets.symmetric(
-                horizontal:
-                14.w,
-                vertical:
-                9.h,
+                horizontal: 15.w,
+                vertical: 9.h,
               ),
-
               decoration:
               BoxDecoration(
-                color:
-                accent
-                    .withOpacity(
-                  _isDark
-                      ? .09
-                      : .07,
-                ),
-
+                color: _surfaceSoft,
                 borderRadius:
-                BorderRadius
-                    .circular(
-                  30.r,
+                BorderRadius.circular(
+                  100.r,
                 ),
-
-                border:
-                Border.all(
-                  color:
-                  accent
-                      .withOpacity(
-                    .12,
-                  ),
+                border: Border.all(
+                  color: _isDark
+                      ? Colors.white
+                      .withOpacity(.07)
+                      : Colors.black
+                      .withOpacity(.05),
                 ),
               ),
-
-              child:
-              Row(
+              child: Row(
+                mainAxisSize:
+                MainAxisSize.min,
                 children: [
                   Text(
                     'Explore',
                     style:
-                    GoogleFonts.inter(
-                      color:
-                      accent,
-                      fontSize:
-                      12.sp,
+                    GoogleFonts.manrope(
+                      color: _primary,
+                      fontSize: 10.sp,
                       fontWeight:
                       FontWeight.w700,
                     ),
                   ),
-
-                  SizedBox(
-                    width:
-                    4.w,
-                  ),
-
+                  SizedBox(width: 5.w),
                   Icon(
                     Icons
                         .arrow_forward_rounded,
-                    color:
-                    accent,
-                    size:
-                    15.sp,
+                    color: _primary,
+                    size: 13.sp,
                   ),
                 ],
               ),
@@ -1992,130 +1174,124 @@ class _HomeScreenState
   // ============================================================
 
   Widget _buildCategories(
-      Map<String, dynamic>
-      categories,
-      Color text,
+      Map<String, dynamic> categories,
       ) {
-    return SizedBox(
-      height:
-      190.h,
+    final entries =
+    categories.entries.toList();
 
-      child:
-      ListView.builder(
+    return SizedBox(
+      height: 125.h,
+      child: ListView.builder(
         padding:
         EdgeInsets.symmetric(
-          horizontal:
-          20.w,
+          horizontal: 12.w,
         ),
-
         scrollDirection:
         Axis.horizontal,
-
         physics:
         const BouncingScrollPhysics(),
-
-        itemCount:
-        categories.length,
-
-        itemBuilder:
-            (
+        itemCount: entries.length,
+        itemBuilder: (
             context,
             index,
             ) {
+          final entry =
+          entries[index];
+
           final categoryName =
-          categories.keys
-              .toList()[index];
+              entry.key;
 
           final category =
-          categories[
-          categoryName];
+          Map<String, dynamic>.from(
+            entry.value,
+          );
 
-          final String
-          thumbnail =
-          category[
-          'thumbnail'];
+          final thumbnail =
+              category['thumbnail']
+                  ?.toString() ??
+                  '';
 
-          final List<dynamic>
-          wallpapers =
-              category[
-              'wallpapers'] ??
-                  [];
+          final wallpapers =
+          List<dynamic>.from(
+            category['wallpapers'] ??
+                const [],
+          );
 
-          return _AnimatedCategoryCard(
-            index:
-            index,
-            thumbnail:
-            thumbnail,
-            title:
-            categoryName,
-            count:
-            wallpapers.length,
-            onTap: () {
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  transitionDuration:
-                  const Duration(
-                    milliseconds:
-                    500,
-                  ),
+          return Padding(
+            padding: EdgeInsets.only(
+              right: 8.w,
+            ),
+            child: _CategoryTile(
+              title: categoryName,
+              thumbnail: thumbnail,
+              count:
+              wallpapers.length,
+              onTap: () {
+                HapticFeedback
+                    .selectionClick();
 
-                  pageBuilder:
-                      (
-                      _,
-                      animation,
-                      __,
-                      ) {
-                    return CategoryScreen(
-                      title:
-                      categoryName,
-                      wallpapers:
-                      List<String>.from(
-                        wallpapers,
-                      ),
-                    );
-                  },
-
-                  transitionsBuilder:
-                      (
-                      _,
-                      animation,
-                      __,
-                      child,
-                      ) {
-                    final curve =
-                    CurvedAnimation(
-                      parent:
-                      animation,
-                      curve:
-                      Curves.easeOutCubic,
-                    );
-
-                    return FadeTransition(
-                      opacity:
-                      curve,
-                      child:
-                      SlideTransition(
-                        position:
-                        Tween<Offset>(
-                          begin:
-                          const Offset(
-                            .12,
-                            0,
-                          ),
-                          end:
-                          Offset.zero,
-                        ).animate(
-                          curve,
+                Navigator.of(context)
+                    .push(
+                  PageRouteBuilder(
+                    transitionDuration:
+                    const Duration(
+                      milliseconds: 320,
+                    ),
+                    reverseTransitionDuration:
+                    const Duration(
+                      milliseconds: 230,
+                    ),
+                    pageBuilder: (
+                        context,
+                        animation,
+                        secondaryAnimation,
+                        ) {
+                      return CategoryScreen(
+                        title:
+                        categoryName,
+                        wallpapers:
+                        List<String>.from(
+                          wallpapers,
                         ),
-                        child:
+                      );
+                    },
+                    transitionsBuilder: (
+                        context,
+                        animation,
+                        secondaryAnimation,
                         child,
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
+                        ) {
+                      final curved =
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: Curves
+                            .easeOutCubic,
+                      );
+
+                      return FadeTransition(
+                        opacity: curved,
+                        child:
+                        SlideTransition(
+                          position:
+                          Tween<Offset>(
+                            begin:
+                            const Offset(
+                              .035,
+                              0,
+                            ),
+                            end:
+                            Offset.zero,
+                          ).animate(
+                            curved,
+                          ),
+                          child: child,
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
@@ -2123,112 +1299,220 @@ class _HomeScreenState
   }
 
   // ============================================================
-  // GLASS ICON BUTTON
+  // TRENDING HEADER
   // ============================================================
 
-  Widget _glassIconButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return _HeroPressButton(
-      onTap:
-      onTap,
-
-      child:
-      Container(
-        width:
-        48.w,
-        height:
-        48.w,
-
-        decoration:
-        BoxDecoration(
-          color:
-          Colors.white
-              .withOpacity(
-            .11,
-          ),
-
-          borderRadius:
-          BorderRadius
-              .circular(
-            17.r,
-          ),
-
-          border:
-          Border.all(
-            color:
-            Colors.white
-                .withOpacity(
-              .15,
+  Widget _buildTrendingHeader() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        19.w,
+        35.h,
+        19.w,
+        13.h,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Frame Spotlight',
+                  style:
+                  GoogleFonts.bebasNeue(
+                    color: _primary,
+                    fontSize: 24.sp,
+                    fontWeight:
+                    FontWeight.w400,
+                    height: 1,
+                    letterSpacing: -.5,
+                  ),
+                ),
+                SizedBox(height: 5.h),
+                Text(
+                  'A few people are loving right now',
+                  style: GoogleFonts.manrope(
+                    color: _secondary,
+                    fontSize: 11.sp,
+                    fontWeight:
+                    FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-
-        child:
-        Icon(
-          icon,
-          color:
-          Colors.white,
-          size:
-          21.sp,
-        ),
+        ],
       ),
     );
   }
 
   // ============================================================
-  // SMALL SECTION BUTTON
+  // CARD HEIGHTS
   // ============================================================
 
-  Widget _smallSectionButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return _PressableButton(
-      onTap:
-      onTap,
+  double _feedCardHeight(int index) {
+    final heights = [
+      265.h,
+      205.h,
+      290.h,
+      230.h,
+      275.h,
+      215.h,
+    ];
 
-      child:
-      Container(
-        width:
-        40.w,
-        height:
-        40.w,
+    return heights[
+    index % heights.length];
+  }
 
-        decoration:
-        BoxDecoration(
-          borderRadius:
-          BorderRadius
-              .circular(
-            14.r,
-          ),
+  // ============================================================
+  // LOADING
+  // ============================================================
 
-          color:
-          _accent
-              .withOpacity(
-            _isDark
-                ? .09
-                : .07,
-          ),
-
-          border:
-          Border.all(
-            color:
-            _accent
-                .withOpacity(
-              .12,
+  Widget _buildLoading() {
+    return Center(
+      child: Column(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          Container(
+            width: 58.w,
+            height: 58.w,
+            decoration:
+            BoxDecoration(
+              color:
+              _accent.withOpacity(.10),
+              borderRadius:
+              BorderRadius.circular(
+                20.r,
+              ),
+              border: Border.all(
+                color:
+                _accent.withOpacity(.14),
+              ),
+            ),
+            child: Icon(
+              Icons
+                  .auto_awesome_rounded,
+              color: _accent,
+              size: 25.sp,
             ),
           ),
-        ),
+          SizedBox(height: 18.h),
+          Text(
+            'Loading wallpapers',
+            style: GoogleFonts.manrope(
+              color: _secondary,
+              fontSize: 13.sp,
+              fontWeight:
+              FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-        child:
-        Icon(
-          icon,
-          color:
-          _accent,
-          size:
-          18.sp,
+  // ============================================================
+  // ERROR
+  // ============================================================
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding:
+        EdgeInsets.all(24.w),
+        child: Column(
+          mainAxisSize:
+          MainAxisSize.min,
+          children: [
+            Container(
+              width: 72.w,
+              height: 72.w,
+              decoration:
+              BoxDecoration(
+                shape:
+                BoxShape.circle,
+                color:
+                _accent.withOpacity(.10),
+                border: Border.all(
+                  color:
+                  _accent.withOpacity(.12),
+                ),
+              ),
+              child: Icon(
+                Icons
+                    .wifi_off_rounded,
+                color: _accent,
+                size: 32.sp,
+              ),
+            ),
+
+            SizedBox(height: 22.h),
+
+            Text(
+              'Unable to load wallpapers',
+              textAlign:
+              TextAlign.center,
+              style:
+              GoogleFonts.manrope(
+                color: _primary,
+                fontSize: 18.sp,
+                fontWeight:
+                FontWeight.w800,
+              ),
+            ),
+
+            SizedBox(height: 8.h),
+
+            Text(
+              'Check your connection and try again.',
+              textAlign:
+              TextAlign.center,
+              style:
+              GoogleFonts.manrope(
+                color: _secondary,
+                fontSize: 13.sp,
+              ),
+            ),
+
+            SizedBox(height: 24.h),
+
+            _Pressable(
+              onTap: _refresh,
+              scale: .95,
+              child: Container(
+                padding:
+                EdgeInsets.symmetric(
+                  horizontal: 24.w,
+                  vertical: 13.h,
+                ),
+                decoration:
+                BoxDecoration(
+                  color:
+                  _accent.withOpacity(.10),
+                  borderRadius:
+                  BorderRadius.circular(
+                    18.r,
+                  ),
+                  border: Border.all(
+                    color:
+                    _accent.withOpacity(.14),
+                  ),
+                ),
+                child: Text(
+                  'Try Again',
+                  style:
+                  GoogleFonts.manrope(
+                    color: _accent,
+                    fontWeight:
+                    FontWeight.w700,
+                    fontSize: 13.sp,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2248,6 +1532,7 @@ class _HomeScreenState
         fileName.replaceAll(
           RegExp(
             r'\.(jpg|jpeg|png|webp)$',
+            caseSensitive: false,
           ),
           '',
         );
@@ -2269,294 +1554,353 @@ class _HomeScreenState
     return fileName
         .split(' ')
         .map(
-          (e) => e.isNotEmpty
-          ? e[0]
-          .toUpperCase() +
-          e.substring(1)
-          : '',
+          (word) {
+        if (word.isEmpty) {
+          return '';
+        }
+
+        return word[0]
+            .toUpperCase() +
+            word.substring(1);
+      },
     )
         .join(' ');
   }
 }
 
 // ==================================================================
-// ANIMATED CATEGORY CARD
+// FEATURED IMAGE
 // ==================================================================
 
-class _AnimatedCategoryCard
-    extends StatefulWidget {
-  final int index;
-  final String thumbnail;
-  final String title;
-  final int count;
-  final VoidCallback onTap;
+class _FeaturedImage
+    extends StatelessWidget {
+  final String image;
 
-  const _AnimatedCategoryCard({
-    required this.index,
-    required this.thumbnail,
-    required this.title,
-    required this.count,
-    required this.onTap,
+  const _FeaturedImage({
+    required this.image,
   });
-
-  @override
-  State<
-      _AnimatedCategoryCard>
-  createState() =>
-      _AnimatedCategoryCardState();
-}
-
-class _AnimatedCategoryCardState
-    extends State<
-        _AnimatedCategoryCard> {
-  bool pressed = false;
 
   @override
   Widget build(
       BuildContext context,
       ) {
-    final isDark =
-        Theme.of(context)
-            .brightness ==
-            Brightness.dark;
+    return Image.network(
+      image,
+      fit: BoxFit.cover,
+      filterQuality:
+      FilterQuality.medium,
+      cacheWidth: 1100,
+      errorBuilder: (
+          context,
+          error,
+          stackTrace,
+          ) {
+        final dark =
+            Theme.of(context)
+                .brightness ==
+                Brightness.dark;
 
-    final surface =
-    isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
-
-    final divider =
-    isDark
-        ? AppColors.darkDivider
-        : AppColors.lightDivider;
-
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() {
-          pressed = true;
-        });
-      },
-
-      onTapCancel: () {
-        setState(() {
-          pressed = false;
-        });
-      },
-
-      onTapUp: (_) {
-        setState(() {
-          pressed = false;
-        });
-
-        widget.onTap();
-      },
-
-      child:
-      AnimatedScale(
-        scale:
-        pressed ? .94 : 1,
-
-        duration:
-        const Duration(
-          milliseconds:
-          180,
-        ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        Container(
-          width:
-          154.w,
-
-          margin:
-          EdgeInsets.only(
-            right:
-            14.w,
+        return Container(
+          color: dark
+              ? AppColors
+              .darkSurface
+              : AppColors
+              .lightSurface,
+          child: Icon(
+            Icons
+                .broken_image_outlined,
+            color: dark
+                ? AppColors
+                .darkMuted
+                : AppColors
+                .lightMuted,
+            size: 48.sp,
           ),
+        );
+      },
+    );
+  }
+}
 
-          decoration:
-          BoxDecoration(
-            borderRadius:
-            BorderRadius
-                .circular(
-              28.r,
+// ==================================================================
+// FEATURED INDICATOR
+// ==================================================================
+
+class _FeaturedIndicator
+    extends StatelessWidget {
+  final int count;
+  final int current;
+
+  const _FeaturedIndicator({
+    required this.count,
+    required this.current,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    final visible =
+    count > 6 ? 6 : count;
+
+    return Row(
+      children:
+      List.generate(
+        visible,
+            (index) {
+          final active =
+              index == current;
+
+          return AnimatedContainer(
+            duration:
+            const Duration(
+              milliseconds: 240,
             ),
-
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black
-                    .withOpacity(
-                  isDark
-                      ? .24
-                      : .12,
-                ),
-                blurRadius:
-                22,
-                offset:
-                const Offset(
-                  0,
-                  12,
-                ),
+            curve:
+            Curves.easeOutCubic,
+            margin:
+            EdgeInsets.only(
+              right: 5.w,
+            ),
+            width:
+            active ? 22.w : 6.w,
+            height: 4.h,
+            decoration:
+            BoxDecoration(
+              color: active
+                  ? Colors.white
+                  : Colors.white
+                  .withOpacity(.30),
+              borderRadius:
+              BorderRadius.circular(
+                50.r,
               ),
-            ],
-          ),
-
-          child:
-          ClipRRect(
-            borderRadius:
-            BorderRadius
-                .circular(
-              28.r,
             ),
+          );
+        },
+      ),
+    );
+  }
+}
 
-            child:
-            Stack(
-              fit:
-              StackFit.expand,
+// ==================================================================
+// FEED WALLPAPER CARD
+// ==================================================================
 
+class _FeedWallpaperCard
+    extends StatelessWidget {
+  final String image;
+  final String title;
+  final int index;
+  final double height;
+  final VoidCallback onTap;
+
+  const _FeedWallpaperCard({
+    required this.image,
+    required this.title,
+    required this.index,
+    required this.height,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return _Pressable(
+      onTap: onTap,
+      scale: .985,
+      child: Hero(
+        tag: 'feed-$image',
+        child: ClipRRect(
+          borderRadius:
+          BorderRadius.circular(
+            28.r,
+          ),
+          child: SizedBox(
+            height: height,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Image.network(
-                  widget.thumbnail,
-                  fit:
-                  BoxFit.cover,
-                  filterQuality:
-                  FilterQuality
-                      .medium,
+                // ==========================================
+                // IMAGE
+                // ==========================================
 
-                  errorBuilder:
-                      (
+                Image.network(
+                  image,
+                  fit: BoxFit.cover,
+                  filterQuality:
+                  FilterQuality.low,
+                  cacheWidth: 900,
+                  errorBuilder: (
                       context,
                       error,
                       stackTrace,
                       ) {
                     return Container(
-                      color:
-                      surface,
-                      child:
-                      Icon(
+                      color: Theme.of(
+                        context,
+                      ).brightness ==
+                          Brightness.dark
+                          ? AppColors
+                          .darkSurface
+                          : AppColors
+                          .lightSurface,
+                      child: Icon(
                         Icons
                             .broken_image_outlined,
-                        color:
-                        AppColors
-                            .lightMuted,
+                        color: AppColors
+                            .accent,
+                        size: 40.sp,
                       ),
                     );
                   },
                 ),
 
-                Container(
+                // ==========================================
+                // OVERLAY
+                // ==========================================
+
+                const DecoratedBox(
                   decoration:
-                  const BoxDecoration(
+                  BoxDecoration(
                     gradient:
                     LinearGradient(
                       begin:
-                      Alignment
-                          .topCenter,
+                      Alignment.topCenter,
                       end:
-                      Alignment
-                          .bottomCenter,
+                      Alignment.bottomCenter,
                       colors: [
-                        Colors
-                            .transparent,
-                        Color(
-                          0xD1000000,
-                        ),
+                        Color(0x05000000),
+                        Color(0x16000000),
+                        Color(0xD9000000),
+                      ],
+                      stops: [
+                        0,
+                        .48,
+                        1,
                       ],
                     ),
                   ),
                 ),
 
-                Padding(
-                  padding:
-                  EdgeInsets.all(
-                    15.w,
-                  ),
+                // ==========================================
+                // NUMBER
+                // ==========================================
 
-                  child:
-                  Column(
+                Positioned(
+                  top: 15.h,
+                  left: 15.w,
+                  child: Container(
+                    padding:
+                    EdgeInsets.symmetric(
+                      horizontal: 9.w,
+                      vertical: 6.h,
+                    ),
+                    decoration:
+                    BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(.18),
+                      borderRadius:
+                      BorderRadius.circular(
+                        50.r,
+                      ),
+                      border: Border.all(
+                        color: Colors.white
+                            .withOpacity(.10),
+                      ),
+                    ),
+                    child: Text(
+                      '#${index.toString().padLeft(2, '0')}',
+                      style:
+                      GoogleFonts.manrope(
+                        color: Colors.white
+                            .withOpacity(.85),
+                        fontSize: 8.sp,
+                        fontWeight:
+                        FontWeight.w800,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ==========================================
+                // ARROW
+                // ==========================================
+
+                Positioned(
+                  top: 15.h,
+                  right: 15.w,
+                  child: Container(
+                    width: 36.w,
+                    height: 36.w,
+                    decoration:
+                    BoxDecoration(
+                      color: Colors.black
+                          .withOpacity(.18),
+                      shape:
+                      BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white
+                            .withOpacity(.10),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons
+                          .arrow_outward_rounded,
+                      color:
+                      Colors.white,
+                      size: 16.sp,
+                    ),
+                  ),
+                ),
+
+                // ==========================================
+                // TEXT
+                // ==========================================
+
+                Positioned(
+                  left: 17.w,
+                  right: 17.w,
+                  bottom: 17.h,
+                  child: Column(
                     crossAxisAlignment:
                     CrossAxisAlignment
                         .start,
-
-                    mainAxisAlignment:
-                    MainAxisAlignment
-                        .end,
-
                     children: [
-                      Container(
-                        padding:
-                        EdgeInsets
-                            .symmetric(
-                          horizontal:
-                          9.w,
-                          vertical:
-                          5.h,
-                        ),
-
-                        decoration:
-                        BoxDecoration(
-                          color: Colors
-                              .white
-                              .withOpacity(
-                            .12,
-                          ),
-
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            30.r,
-                          ),
-
-                          border:
-                          Border.all(
-                            color: Colors
-                                .white
-                                .withOpacity(
-                              .12,
-                            ),
-                          ),
-                        ),
-
-                        child:
-                        Text(
-                          '${widget.count} wallpapers',
-                          style:
-                          GoogleFonts.inter(
-                            color:
-                            Colors.white,
-                            fontSize:
-                            9.sp,
-                            fontWeight:
-                            FontWeight.w700,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(
-                        height:
-                        8.h,
-                      ),
-
                       Text(
-                        widget.title,
-                        maxLines:
-                        2,
+                        title.isEmpty
+                            ? 'Wallpaper'
+                            : title,
+                        maxLines: 2,
                         overflow:
                         TextOverflow
                             .ellipsis,
                         style:
-                        GoogleFonts.poppins(
+                        GoogleFonts.bebasNeue(
                           color:
                           Colors.white,
-                          fontSize:
-                          19.sp,
+                          fontSize: 23.sp,
                           fontWeight:
-                          FontWeight
-                              .w800,
-                          height:
-                          1,
+                          FontWeight.w400,
+                          height: .95,
+                          letterSpacing:
+                          -.7,
+                        ),
+                      ),
+                      SizedBox(height: 5.h),
+                      Text(
+                        'Tap to preview',
+                        style:
+                        GoogleFonts.manrope(
+                          color: Colors.white
+                              .withOpacity(
+                            .62,
+                          ),
+                          fontSize: 9.sp,
+                          fontWeight:
+                          FontWeight.w500,
                         ),
                       ),
                     ],
@@ -2567,396 +1911,277 @@ class _AnimatedCategoryCardState
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds:
-        500,
-      ),
-      delay:
-      Duration(
-        milliseconds:
-        80 *
-            widget.index,
-      ),
-    )
-        .moveX(
-      begin:
-      35,
-      end:
-      0,
-      duration:
-      const Duration(
-        milliseconds:
-        650,
-      ),
-      curve:
-      Curves.easeOutCubic,
     );
   }
 }
 
 // ==================================================================
-// ANIMATED WALLPAPER CARD
+// CATEGORY TILE
 // ==================================================================
 
-class _AnimatedWallpaperCard
-    extends StatefulWidget {
-  final String image;
-  final int index;
+class _CategoryTile
+    extends StatelessWidget {
+  final String title;
+  final String thumbnail;
+  final int count;
   final VoidCallback onTap;
 
-  const _AnimatedWallpaperCard({
-    required this.image,
-    required this.index,
+  const _CategoryTile({
+    required this.title,
+    required this.thumbnail,
+    required this.count,
     required this.onTap,
   });
-
-  @override
-  State<
-      _AnimatedWallpaperCard>
-  createState() =>
-      _AnimatedWallpaperCardState();
-}
-
-class _AnimatedWallpaperCardState
-    extends State<
-        _AnimatedWallpaperCard> {
-  bool pressed = false;
 
   @override
   Widget build(
       BuildContext context,
       ) {
-    final isDark =
+    final dark =
         Theme.of(context)
             .brightness ==
             Brightness.dark;
 
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() {
-          pressed = true;
-        });
-      },
-
-      onTapCancel: () {
-        setState(() {
-          pressed = false;
-        });
-      },
-
-      onTapUp: (_) {
-        setState(() {
-          pressed = false;
-        });
-
-        widget.onTap();
-      },
-
-      child:
-      AnimatedScale(
-        scale:
-        pressed ? .96 : 1,
-
-        duration:
-        const Duration(
-          milliseconds:
-          160,
+    return _Pressable(
+      onTap: onTap,
+      scale: .96,
+      child: ClipRRect(
+        borderRadius:
+        BorderRadius.circular(
+          23.r,
         ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        Hero(
-          tag:
-          'trending-${widget.image}',
-
-          child:
-          ClipRRect(
-            borderRadius:
-            BorderRadius
-                .circular(
-              25.r,
-            ),
-
-            child:
-            Stack(
-              children: [
-                Image.network(
-                  widget.image,
-                  fit:
-                  BoxFit.cover,
-                  filterQuality:
-                  FilterQuality
-                      .high,
-
-                  errorBuilder:
-                      (
-                      context,
-                      error,
-                      stackTrace,
-                      ) {
-                    return Container(
-                      height:
-                      220.h,
-
-                      color:
-                      isDark
+        child: SizedBox(
+          width: 145.w,
+          height: 125.h,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                thumbnail,
+                fit: BoxFit.cover,
+                filterQuality:
+                FilterQuality.low,
+                cacheWidth: 450,
+                errorBuilder: (
+                    context,
+                    error,
+                    stackTrace,
+                    ) {
+                  return Container(
+                    color: dark
+                        ? AppColors
+                        .darkSurface
+                        : AppColors
+                        .lightSurface,
+                    child: Icon(
+                      Icons
+                          .image_not_supported_outlined,
+                      color: dark
                           ? AppColors
-                          .darkSurface
+                          .darkMuted
                           : AppColors
-                          .lightSurface,
-
-                      alignment:
-                      Alignment
-                          .center,
-
-                      child:
-                      Icon(
-                        Icons
-                            .broken_image_outlined,
-                        color:
-                        isDark
-                            ? AppColors
-                            .darkMuted
-                            : AppColors
-                            .lightMuted,
-                        size:
-                        36.sp,
-                      ),
-                    );
-                  },
-                ),
-
-                Positioned.fill(
-                  child:
-                  IgnorePointer(
-                    child:
-                    Container(
-                      decoration:
-                      const BoxDecoration(
-                        gradient:
-                        LinearGradient(
-                          begin:
-                          Alignment
-                              .topCenter,
-                          end:
-                          Alignment
-                              .bottomCenter,
-                          colors: [
-                            Colors
-                                .transparent,
-                            Color(
-                              0x4D000000,
-                            ),
-                          ],
-                        ),
-                      ),
+                          .lightMuted,
                     ),
+                  );
+                },
+              ),
+
+              const DecoratedBox(
+                decoration:
+                BoxDecoration(
+                  gradient:
+                  LinearGradient(
+                    begin:
+                    Alignment.topCenter,
+                    end:
+                    Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Color(0xD9000000),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              Positioned(
+                left: 13.w,
+                right: 13.w,
+                bottom: 12.h,
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow:
+                      TextOverflow
+                          .ellipsis,
+                      style:
+                      GoogleFonts.bebasNeue(
+                        color:
+                        Colors.white,
+                        fontSize: 16.sp,
+                        fontWeight:
+                        FontWeight.w400,
+                        height: 1,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      '$count wallpapers',
+                      style:
+                      GoogleFonts.manrope(
+                        color: Colors.white
+                            .withOpacity(
+                          .60,
+                        ),
+                        fontSize: 8.sp,
+                        fontWeight:
+                        FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    )
-        .animate()
-        .fadeIn(
-      duration:
-      const Duration(
-        milliseconds:
-        550,
-      ),
-      delay:
-      Duration(
-        milliseconds:
-        70 *
-            widget.index,
-      ),
-    )
-        .moveY(
-      begin:
-      35,
-      end:
-      0,
-      duration:
-      const Duration(
-        milliseconds:
-        650,
-      ),
-      curve:
-      Curves.easeOutCubic,
-    )
-        .scale(
-      begin:
-      const Offset(
-        .96,
-        .96,
-      ),
-      end:
-      const Offset(
-        1,
-        1,
-      ),
-      duration:
-      const Duration(
-        milliseconds:
-        650,
-      ),
-      curve:
-      Curves.easeOutCubic,
     );
   }
 }
 
 // ==================================================================
-// HERO PRESS BUTTON
+// HEADER BUTTON
 // ==================================================================
 
-class _HeroPressButton
-    extends StatefulWidget {
-  final Widget child;
+class _HeaderButton
+    extends StatelessWidget {
+  final IconData icon;
   final VoidCallback onTap;
 
-  const _HeroPressButton({
-    required this.child,
+  const _HeaderButton({
+    required this.icon,
     required this.onTap,
   });
-
-  @override
-  State<_HeroPressButton>
-  createState() =>
-      _HeroPressButtonState();
-}
-
-class _HeroPressButtonState
-    extends State<
-        _HeroPressButton> {
-  bool pressed = false;
 
   @override
   Widget build(
       BuildContext context,
       ) {
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() {
-          pressed = true;
-        });
-      },
+    final dark =
+        Theme.of(context)
+            .brightness ==
+            Brightness.dark;
 
-      onTapCancel: () {
-        setState(() {
-          pressed = false;
-        });
-      },
-
-      onTapUp: (_) {
-        setState(() {
-          pressed = false;
-        });
-
-        HapticFeedback
-            .selectionClick();
-
-        widget.onTap();
-      },
-
-      child:
-      AnimatedScale(
-        scale:
-        pressed ? .92 : 1,
-
-        duration:
-        const Duration(
-          milliseconds:
-          170,
+    return _Pressable(
+      onTap: onTap,
+      scale: .90,
+      child: Container(
+        width: 43.w,
+        height: 43.w,
+        decoration:
+        BoxDecoration(
+          color: dark
+              ? Colors.white
+              .withOpacity(.055)
+              : Colors.black
+              .withOpacity(.045),
+          borderRadius:
+          BorderRadius.circular(
+            15.r,
+          ),
+          border: Border.all(
+            color: dark
+                ? Colors.white
+                .withOpacity(.06)
+                : Colors.black
+                .withOpacity(.05),
+          ),
         ),
-
-        curve:
-        Curves.easeOutCubic,
-
-        child:
-        widget.child,
+        child: Icon(
+          icon,
+          color: dark
+              ? Colors.white
+              : Colors.black,
+          size: 19.sp,
+        ),
       ),
     );
   }
 }
 
 // ==================================================================
-// NORMAL PRESS BUTTON
+// PRESSABLE
 // ==================================================================
 
-class _PressableButton
+class _Pressable
     extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
+  final double scale;
 
-  const _PressableButton({
+  const _Pressable({
     required this.child,
     required this.onTap,
+    this.scale = .96,
   });
 
   @override
-  State<_PressableButton>
-  createState() =>
-      _PressableButtonState();
+  State<_Pressable> createState() =>
+      _PressableState();
 }
 
-class _PressableButtonState
-    extends State<
-        _PressableButton> {
+class _PressableState
+    extends State<_Pressable> {
   bool pressed = false;
+
+  void _setPressed(
+      bool value,
+      ) {
+    if (pressed == value) {
+      return;
+    }
+
+    setState(() {
+      pressed = value;
+    });
+  }
 
   @override
   Widget build(
       BuildContext context,
       ) {
     return GestureDetector(
+      behavior:
+      HitTestBehavior.opaque,
+
       onTapDown: (_) {
-        setState(() {
-          pressed = true;
-        });
+        _setPressed(true);
       },
 
       onTapCancel: () {
-        setState(() {
-          pressed = false;
-        });
+        _setPressed(false);
       },
 
       onTapUp: (_) {
-        setState(() {
-          pressed = false;
-        });
-
-        HapticFeedback
-            .selectionClick();
-
+        _setPressed(false);
         widget.onTap();
       },
 
-      child:
-      AnimatedScale(
-        scale:
-        pressed ? .93 : 1,
-
+      child: AnimatedScale(
+        scale: pressed
+            ? widget.scale
+            : 1.0,
         duration:
         const Duration(
-          milliseconds:
-          170,
+          milliseconds: 120,
         ),
-
         curve:
         Curves.easeOutCubic,
-
-        child:
-        widget.child,
+        child: widget.child,
       ),
     );
   }
