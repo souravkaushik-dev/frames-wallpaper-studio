@@ -85,28 +85,21 @@ class _PreviewScreenState extends State<PreviewScreen>
       ),
     );
 
-    _uiOpacity = CurvedAnimation(
+    final uiAnimation = CurvedAnimation(
       parent: _introController,
       curve: const Interval(
         .08,
-        1,
+        1.0,
         curve: Curves.easeOutCubic,
       ),
     );
 
+    _uiOpacity = uiAnimation;
+
     _uiSlide = Tween<Offset>(
-      begin: const Offset(0, .035),
+      begin: const Offset(0, .025),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _introController,
-        curve: const Interval(
-          .08,
-          1,
-          curve: Curves.easeOutCubic,
-        ),
-      ),
-    );
+    ).animate(uiAnimation);
 
     _loadFavorite();
 
@@ -237,58 +230,81 @@ class _PreviewScreenState extends State<PreviewScreen>
   // BUILD
   // ===========================================================================
 
+  ThemeData _expressiveTheme(BuildContext context) {
+    final base = Theme.of(context);
+    final dark = base.brightness == Brightness.dark;
+
+    final scheme = base.colorScheme.copyWith(
+      primary: AppColors.accent,
+      onPrimary: Colors.white,
+      surface: dark ? AppColors.darkSurface : AppColors.lightSurface,
+      onSurface: dark ? AppColors.darkPrimary : AppColors.lightPrimary,
+      outline: dark ? AppColors.darkDivider : AppColors.lightDivider,
+    );
+
+    return base.copyWith(
+      useMaterial3: true,
+      colorScheme: scheme,
+      splashFactory: InkSparkle.splashFactory,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset =
         MediaQuery.paddingOf(context).bottom;
 
-    return Scaffold(
-      backgroundColor: _background,
-      extendBody: true,
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          _buildWallpaper(),
-          _buildWallpaperOverlay(),
+    return Theme(
+      data: _expressiveTheme(context),
+      child: Scaffold(
+        backgroundColor: _background,
+        extendBody: true,
+        extendBodyBehindAppBar: true,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildWallpaper(),
+            _buildWallpaperOverlay(),
 
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                12.w,
-                11.h,
-                12.w,
-                0,
-              ),
-              child: IgnorePointer(
-                ignoring: _isSettingWallpaper,
-                child: FadeTransition(
-                  opacity: _uiOpacity,
-                  child: Column(
-                    children: [
-                      _buildTopBar(),
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  12.w,
+                  11.h,
+                  12.w,
+                  0,
+                ),
+                child: IgnorePointer(
+                  ignoring: _isSettingWallpaper,
+                  child: FadeTransition(
+                    opacity: _uiOpacity,
+                    child: SlideTransition(
+                      position: _uiSlide,
+                      child: Column(
+                        children: [
+                          _buildTopBar(),
 
-                      const Spacer(),
+                          const Spacer(),
 
-                      Padding(
-                        padding: EdgeInsets.only(
-                          bottom:
-                          10.h + bottomInset,
-                        ),
-                        child:
-                        _buildBottomControls(),
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: 10.h + bottomInset,
+                            ),
+                            child: _buildBottomControls(),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          if (_isSettingWallpaper)
-            const _SettingOverlay(),
-        ],
+            if (_isSettingWallpaper)
+              const _SettingOverlay(),
+          ],
+        ),
       ),
     );
   }
@@ -466,81 +482,80 @@ class _PreviewScreenState extends State<PreviewScreen>
   //
 
   Widget _buildBottomControls() {
-    return Row(
-      crossAxisAlignment:
-      CrossAxisAlignment.end,
-      children: [
-        SizedBox(
-          width: 126.w,
-          height: 112.w,
-          child: _WallpaperNameBox(
-            name:
-            getWallpaperName(
-              widget.imageUrl,
-            ),
-            category:
-            widget.category,
-          ),
-        ),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 420),
+      reverseDuration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 420),
+        reverseDuration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
+        transitionBuilder: (child, animation) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
 
-        SizedBox(width: 9.w),
-
-        Expanded(
-          child: Align(
-            alignment:
-            Alignment.bottomCenter,
-            child: AnimatedSize(
-              duration:
-              const Duration(
-                milliseconds: 360,
-              ),
-              reverseDuration:
-              const Duration(
-                milliseconds: 300,
-              ),
-              curve:
-              Curves.easeOutCubic,
-              alignment:
-              Alignment.bottomCenter,
-              child: _showSetPanel
-                  ? _SetPanel(
-                onClose:
-                _closeSetPanel,
-                onHome: () {
-                  _applyWallpaper(
-                    WallpaperManagerPlus
-                        .homeScreen,
-                    'Home Screen',
-                  );
-                },
-                onLock: () {
-                  _applyWallpaper(
-                    WallpaperManagerPlus
-                        .lockScreen,
-                    'Lock Screen',
-                  );
-                },
-                onBoth: () {
-                  _applyWallpaper(
-                    WallpaperManagerPlus
-                        .bothScreens,
-                    'Both Screens',
-                  );
-                },
-              )
-                  : SizedBox(
-                width: double.infinity,
-                height: 112.w,
-                child:
-                _SetActionCard(
-                  onTap:
-                  _openSetPanel,
-                ),
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, .035),
+                end: Offset.zero,
+              ).animate(curved),
+              child: ScaleTransition(
+                scale: Tween<double>(
+                  begin: .985,
+                  end: 1.0,
+                ).animate(curved),
+                alignment: Alignment.bottomCenter,
+                child: child,
               ),
             ),
-          ),
+          );
+        },
+        child: _showSetPanel
+            ? _SetPanel(
+          key: const ValueKey('wallpaper-set-panel'),
+          onClose: _closeSetPanel,
+          onHome: () {
+            _applyWallpaper(
+              WallpaperManagerPlus.homeScreen,
+              'Home Screen',
+            );
+          },
+          onLock: () {
+            _applyWallpaper(
+              WallpaperManagerPlus.lockScreen,
+              'Lock Screen',
+            );
+          },
+          onBoth: () {
+            _applyWallpaper(
+              WallpaperManagerPlus.bothScreens,
+              'Both Screens',
+            );
+          },
+        )
+            : _PreviewBottomBar(
+          key: const ValueKey('wallpaper-preview-bar'),
+          name: getWallpaperName(widget.imageUrl),
+          category: widget.category,
+          onSet: _openSetPanel,
         ),
-      ],
+      ),
     );
   }
 
@@ -1153,50 +1168,40 @@ class _CustomSquare
     extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
-  final Color color;
+  final Color? color;
   final double radius;
 
   const _CustomSquare({
     required this.child,
-    required this.color,
+    this.color,
     this.padding,
     this.radius = 30,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      elevation: 0,
-      shadowColor:
-      Colors.transparent,
-      surfaceTintColor:
-      Colors.transparent,
-      clipBehavior:
-      Clip.antiAlias,
-      shape:
-      ContinuousRectangleBorder(
-        borderRadius:
-        BorderRadius.circular(
-          radius.r,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final glassColor = color ??
+        (isDark
+            ? const Color(0xFF202020).withOpacity(.82)
+            : const Color(0xFFF7F7F4).withOpacity(.82));
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius.r),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: 16,
+          sigmaY: 16,
         ),
-        side: BorderSide(
-          color:
-          Colors.black.withOpacity(.045),
-          width: 1,
-        ),
-      ),
-      child: Container(
-        padding: padding,
-        decoration:
-        BoxDecoration(
-          color: color,
-          borderRadius:
-          BorderRadius.circular(
-            radius.r,
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: glassColor,
+            borderRadius: BorderRadius.circular(radius.r),
+            boxShadow: const [],
           ),
+          child: child,
         ),
-        child: child,
       ),
     );
   }
@@ -1206,12 +1211,45 @@ class _CustomSquare
 // WALLPAPER NAME BOX
 // ==============================================================================
 
-class _WallpaperNameBox
-    extends StatelessWidget {
+class _PreviewBottomBar extends StatelessWidget {
+  final String name;
+  final String category;
+  final VoidCallback onSet;
+
+  const _PreviewBottomBar({
+    super.key,
+    required this.name,
+    required this.category,
+    required this.onSet,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          flex: 7,
+          child: _WallpaperTitleCard(
+            name: name,
+            category: category,
+          ),
+        ),
+        SizedBox(width: 10.w),
+        Expanded(
+          flex: 5,
+          child: _SetWallpaperButton(onTap: onSet),
+        ),
+      ],
+    );
+  }
+}
+
+class _WallpaperTitleCard extends StatelessWidget {
   final String name;
   final String category;
 
-  const _WallpaperNameBox({
+  const _WallpaperTitleCard({
     required this.name,
     required this.category,
   });
@@ -1219,75 +1257,70 @@ class _WallpaperNameBox
   @override
   Widget build(BuildContext context) {
     return _CustomSquare(
-      color:
-      const Color(0xFFF7F7F4),
-      radius: 32,
-      padding:
-      EdgeInsets.fromLTRB(
-        15.w,
-        14.w,
-        13.w,
-        14.w,
-      ),
-      child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+      color: null,
+      radius: 28,
+      padding: EdgeInsets.fromLTRB(15.w, 13.w, 15.w, 13.w),
+      child: Row(
         children: [
           Container(
             width: 38.w,
             height: 38.w,
-            decoration:
-            const BoxDecoration(
-              color:
-              Color(0xFFFFFFFF),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF2C2C2C)
+                  : const Color(0xFFFFFFFF),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons
-                  .auto_awesome_rounded,
-              color:
-              Colors.black
-                  .withOpacity(.60),
+              Hicons.display4LightOutline,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withOpacity(.86)
+                  : Colors.black54,
               size: 18.sp,
             ),
           ),
-
-          const Spacer(),
-
-          Text(
-            name,
-            maxLines: 3,
-            overflow:
-            TextOverflow.ellipsis,
-            style:
-            GoogleFonts.manrope(
-              color:
-              Colors.black
-                  .withOpacity(.78),
-              fontSize: 12.5.sp,
-              fontWeight:
-              FontWeight.w500,
-              height: 1.16,
-              letterSpacing: -.25,
-            ),
-          ),
-
-          SizedBox(height: 7.h),
-
-          Text(
-            category.toUpperCase(),
-            maxLines: 1,
-            overflow:
-            TextOverflow.ellipsis,
-            style:
-            GoogleFonts.manrope(
-              color:
-              Colors.black
-                  .withOpacity(.34),
-              fontSize: 6.sp,
-              fontWeight:
-              FontWeight.w800,
-              letterSpacing: 1.05,
+          SizedBox(width: 11.w),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'NOW VIEWING',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.bebasNeue(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(.52) : Colors.black.withOpacity(.42),
+                    fontSize: 7.5.sp,
+                    height: .95,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.bebasNeue(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(.94) : Colors.black.withOpacity(.86),
+                    fontSize: 16.sp,
+                    height: .92,
+                    letterSpacing: .55,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  category.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.bebasNeue(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(.48) : Colors.black.withOpacity(.40),
+                    fontSize: 7.5.sp,
+                    height: .95,
+                    letterSpacing: .9,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1296,132 +1329,105 @@ class _WallpaperNameBox
   }
 }
 
-// ==============================================================================
-// SET ACTION CARD
-// ==============================================================================
-
-class _SetActionCard
-    extends StatefulWidget {
+class _SetWallpaperButton extends StatefulWidget {
   final VoidCallback onTap;
 
-  const _SetActionCard({
+  const _SetWallpaperButton({
     required this.onTap,
   });
 
   @override
-  State<_SetActionCard> createState() =>
-      _SetActionCardState();
+  State<_SetWallpaperButton> createState() => _SetWallpaperButtonState();
 }
 
-class _SetActionCardState
-    extends State<_SetActionCard> {
+class _SetWallpaperButtonState extends State<_SetWallpaperButton> {
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      behavior:
-      HitTestBehavior.opaque,
-
-      onTapDown: (_) {
-        setState(() {
-          _pressed = true;
-        });
-      },
-
-      onTapCancel: () {
-        setState(() {
-          _pressed = false;
-        });
-      },
-
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) {
-        setState(() {
-          _pressed = false;
-        });
-
+        setState(() => _pressed = false);
         HapticFeedback.selectionClick();
-
         widget.onTap();
       },
-
       child: AnimatedScale(
         scale: _pressed ? .965 : 1,
-        duration:
-        const Duration(
-          milliseconds: 120,
-        ),
-        curve:
-        Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
         child: _CustomSquare(
-          color:
-          const Color(0xFFF7F7F4),
-          radius: 32,
-          padding:
-          EdgeInsets.all(15.w),
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+          color: null,
+          radius: 28,
+          padding: EdgeInsets.fromLTRB(15.w, 13.w, 13.w, 13.w),
+          child: Row(
             children: [
               Container(
                 width: 38.w,
                 height: 38.w,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  Color(0xFFFFFFFF),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF2C2C2C)
+                      : const Color(0xFFFFFFFF),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.wallpaper_rounded,
-                  color:
-                  Colors.black
-                      .withOpacity(.60),
+                  Hicons.imageLightOutline,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withOpacity(.86)
+                      : Colors.black54,
                   size: 18.sp,
                 ),
               ),
-
-              const Spacer(),
-
-              Row(
-                crossAxisAlignment:
-                CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Text(
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       'SET',
-                      style:
-                      GoogleFonts.bebasNeue(
-                        color:
-                        Colors.black
-                            .withOpacity(.80),
-                        fontSize: 27.sp,
-                        height: .85,
-                        letterSpacing: 1.1,
+                      style: GoogleFonts.bebasNeue(
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(.92) : Colors.black.withOpacity(.82),
+                        fontSize: 25.sp,
+                        height: .88,
+                        letterSpacing: .95,
                       ),
                     ),
-                  ),
-
-                  Container(
-                    width: 34.w,
-                    height: 34.w,
-                    decoration:
-                    const BoxDecoration(
-                      color:
-                      Color(0xFFFFFFFF),
-                      shape:
-                      BoxShape.circle,
+                    SizedBox(height: 3.h),
+                    Text(
+                      'WALLPAPER',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.manrope(
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white38 : Colors.black38,
+                        fontSize: 7.5.sp,
+                        height: .95,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .9,
+                      ),
                     ),
-                    child: Icon(
-                      Icons
-                          .arrow_outward_rounded,
-                      color:
-                      Colors.black
-                          .withOpacity(.62),
-                      size: 15.sp,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+              Container(
+                width: 32.w,
+                height: 32.w,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF2C2C2C)
+                      : const Color(0xFFFFFFFF),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Hicons.send3LightOutline,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withOpacity(.86)
+                      : Colors.black54,
+                  size: 14.sp,
+                ),
               ),
             ],
           ),
@@ -1449,6 +1455,7 @@ class _SetPanel extends StatefulWidget {
   final VoidCallback onBoth;
 
   const _SetPanel({
+    super.key,
     required this.onClose,
     required this.onHome,
     required this.onLock,
@@ -1464,151 +1471,137 @@ class _SetPanelState
     extends State<_SetPanel> {
   @override
   Widget build(BuildContext context) {
-    return _CustomSquare(
-      color:
-      const Color(0xFFF7F7F4),
-      radius: 32,
-      padding:
-      EdgeInsets.all(12.w),
-      child: Column(
-        mainAxisSize:
-        MainAxisSize.min,
-        children: [
-          Row(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30.r),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(16.w, 16.w, 16.w, 14.w),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.black.withOpacity(.58)
+                : Colors.white.withOpacity(.72),
+            borderRadius: BorderRadius.circular(30.r),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 38.w,
-                height: 38.w,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  Color(0xFFFFFFFF),
-                  shape:
-                  BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.wallpaper_rounded,
-                  color:
-                  Colors.black
-                      .withOpacity(.60),
-                  size: 17.sp,
-                ),
-              ),
-
-              SizedBox(width: 9.w),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SET WALLPAPER',
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style:
-                      GoogleFonts.bebasNeue(
-                        color:
-                        Colors.black
-                            .withOpacity(.80),
-                        fontSize: 21.sp,
-                        height: .88,
-                        letterSpacing: 1,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    width: 38.w,
+                    height: 38.w,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF252525)
+                          : const Color(0xFFFFFFFF),
+                      shape: BoxShape.circle,
                     ),
-                    SizedBox(height: 3.h),
-                    Text(
-                      'CHOOSE DISPLAY',
-                      style:
-                      GoogleFonts.manrope(
-                        color:
-                        Colors.black
-                            .withOpacity(.38),
-                        fontSize: 6.sp,
-                        fontWeight:
-                        FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              GestureDetector(
-                behavior:
-                HitTestBehavior.opaque,
-                onTap:
-                widget.onClose,
-                child: Container(
-                  width: 36.w,
-                  height: 36.w,
-                  decoration:
-                  BoxDecoration(
-                    color:
-                    const Color(
-                      0xFFFFFFFF,
-                    ),
-                    borderRadius:
-                    BorderRadius
-                        .circular(
-                      14.r,
-                    ),
-                    border:
-                    Border.all(
-                      color:
-                      Colors.black
-                          .withOpacity(
-                        .035,
-                      ),
+                    child: Icon(
+                      Hicons.imageLightOutline,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withOpacity(.78)
+                          : Colors.black.withOpacity(.60),
+                      size: 17.sp,
                     ),
                   ),
-                  child: Icon(
-                    Icons.close_rounded,
-                    color:
-                    Colors.black
-                        .withOpacity(.62),
-                    size: 17.sp,
+
+                  SizedBox(width: 9.w),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SET WALLPAPER',
+                          maxLines: 1,
+                          overflow:
+                          TextOverflow.ellipsis,
+                          style:
+                          GoogleFonts.bebasNeue(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(.94)
+                                : Colors.black.withOpacity(.80),
+                            fontSize: 23.sp,
+                            height: .90,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        SizedBox(height: 3.h),
+                        Text(
+                          'CHOOSE DISPLAY',
+                          style:
+                          GoogleFonts.bebasNeue(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(.62)
+                                : Colors.black.withOpacity(.48),
+                            fontSize: 8.5.sp,
+                            height: .95,
+                            fontWeight:
+                            FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+
+                  IconButton(
+                    onPressed: widget.onClose,
+                    tooltip: 'Close',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(
+                      minWidth: 36.w,
+                      minHeight: 36.w,
+                    ),
+                    icon: Icon(
+                      Hicons.closeLightOutline,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withOpacity(.68)
+                          : Colors.black.withOpacity(.55),
+                      size: 19.sp,
+                    ),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: 15.h),
+
+              _SetOption(
+                title: 'HOME',
+                subtitle: 'HOME SCREEN',
+                icon:
+                Hicons.home3LightOutline,
+                onTap: widget.onHome,
+              ),
+
+              SizedBox(height: 12.h),
+
+              _SetOption(
+                title: 'LOCK',
+                subtitle: 'LOCK SCREEN',
+                icon:
+                Hicons.lock2LightOutline,
+                onTap: widget.onLock,
+              ),
+
+              SizedBox(height: 12.h),
+
+              _SetOption(
+                title: 'BOTH',
+                subtitle: 'HOME + LOCK',
+                icon:
+                Icons.layers_outlined,
+                onTap: widget.onBoth,
               ),
             ],
           ),
-
-          SizedBox(height: 9.h),
-
-          _SetOption(
-            number: '01',
-            title: 'HOME',
-            subtitle: 'HOME SCREEN',
-            icon:
-            Hicons.home3LightOutline,
-            onTap: widget.onHome,
-          ),
-
-          SizedBox(height: 6.h),
-
-          _SetOption(
-            number: '02',
-            title: 'LOCK',
-            subtitle: 'LOCK SCREEN',
-            icon:
-            Hicons.lock2LightOutline,
-            onTap: widget.onLock,
-          ),
-
-          SizedBox(height: 6.h),
-
-          _SetOption(
-            number: '03',
-            title: 'BOTH',
-            subtitle: 'HOME + LOCK',
-            icon:
-            Icons.layers_outlined,
-            featured: true,
-            onTap: widget.onBoth,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1620,7 +1613,6 @@ class _SetPanelState
 
 class _SetOption
     extends StatefulWidget {
-  final String number;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -1628,7 +1620,6 @@ class _SetOption
   final bool featured;
 
   const _SetOption({
-    required this.number,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -1675,75 +1666,20 @@ class _SetOptionState
 
       child: AnimatedScale(
         scale: _pressed ? .975 : 1,
-        duration:
-        const Duration(
-          milliseconds: 120,
-        ),
-        curve:
-        Curves.easeOutCubic,
-        child: Container(
-          height: 62.h,
-          padding:
-          EdgeInsets.symmetric(
-            horizontal: 8.w,
-          ),
-          decoration:
-          BoxDecoration(
-            color: widget.featured
-                ? AppColors.accent
-                .withOpacity(.12)
-                : Colors.black
-                .withOpacity(.035),
-            borderRadius:
-            BorderRadius.circular(
-              18.r,
-            ),
-            border:
-            Border.all(
-              color: widget.featured
-                  ? AppColors.accent
-                  .withOpacity(.28)
-                  : Colors.black
-                  .withOpacity(.045),
-            ),
-          ),
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 11.h),
           child: Row(
             children: [
               SizedBox(
-                width: 24.w,
-                child: Text(
-                  widget.number,
-                  style:
-                  GoogleFonts.bebasNeue(
-                    color: Colors.black
-                        .withOpacity(.35),
-                    fontSize: 13.sp,
-                    letterSpacing: .5,
-                  ),
-                ),
-              ),
-
-              Container(
                 width: 40.w,
-                height: 40.w,
-                decoration:
-                BoxDecoration(
-                  color: widget.featured
-                      ? AppColors.accent
-                      .withOpacity(.13)
-                      : Colors.white,
-                  borderRadius:
-                  BorderRadius.circular(
-                    13.r,
-                  ),
-                ),
                 child: Icon(
                   widget.icon,
-                  color: widget.featured
-                      ? AppColors.accent
-                      : Colors.black
-                      .withOpacity(.62),
-                  size: 17.sp,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withOpacity(.82)
+                      : Colors.black.withOpacity(.62),
+                  size: 24.sp,
                 ),
               ),
 
@@ -1762,15 +1698,13 @@ class _SetOptionState
                       overflow:
                       TextOverflow.ellipsis,
                       style:
-                      GoogleFonts.manrope(
-                        color: widget.featured
-                            ? AppColors.accent
-                            : Colors.black
-                            .withOpacity(.75),
-                        fontSize: 9.sp,
-                        fontWeight:
-                        FontWeight.w900,
-                        letterSpacing: .7,
+                      GoogleFonts.bebasNeue(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white.withOpacity(.96)
+                            : Colors.black.withOpacity(.86),
+                        fontSize: 15.5.sp,
+                        height: .94,
+                        letterSpacing: 1.05,
                       ),
                     ),
 
@@ -1782,39 +1716,25 @@ class _SetOptionState
                       overflow:
                       TextOverflow.ellipsis,
                       style:
-                      GoogleFonts.manrope(
-                        color: Colors.black
-                            .withOpacity(.34),
-                        fontSize: 5.7.sp,
-                        fontWeight:
-                        FontWeight.w700,
-                        letterSpacing: .55,
+                      GoogleFonts.bebasNeue(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white.withOpacity(.52)
+                            : Colors.black.withOpacity(.42),
+                        fontSize: 9.sp,
+                        height: .96,
+                        letterSpacing: .8,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              Container(
-                width: 29.w,
-                height: 29.w,
-                decoration:
-                BoxDecoration(
-                  color: widget.featured
-                      ? AppColors.accent
-                      : Colors.white,
-                  shape:
-                  BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons
-                      .arrow_outward_rounded,
-                  color: widget.featured
-                      ? Colors.white
-                      : Colors.black
-                      .withOpacity(.55),
-                  size: 12.sp,
-                ),
+              Icon(
+                Hicons.right2LightOutline,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withOpacity(.46)
+                    : Colors.black.withOpacity(.34),
+                size: 21.sp,
               ),
             ],
           ),

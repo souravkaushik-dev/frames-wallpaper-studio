@@ -1,10 +1,10 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:dotty/screens/previewscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
@@ -16,61 +16,129 @@ class SearchScreen extends StatefulWidget {
   });
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  State<SearchScreen> createState() =>
+      _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _searchFocus = FocusNode();
-  final ScrollController _scrollController = ScrollController();
+class _SearchScreenState extends State<SearchScreen>
+    with TickerProviderStateMixin {
+  // ============================================================
+  // CONTROLLERS
+  // ============================================================
+
+  final TextEditingController _controller =
+  TextEditingController();
+
+  final FocusNode _searchFocus =
+  FocusNode();
+
+  final ScrollController _scrollController =
+  ScrollController();
+
+  late AnimationController _introController;
+
+  // ============================================================
+  // DATA
+  // ============================================================
 
   List<Map<String, dynamic>> wallpapers = [];
+
   List<Map<String, dynamic>> filtered = [];
 
+  /// These are populated directly from:
+  ///
+  /// decoded['categories']
+  ///
+  /// No hard-coded wallpaper categories.
+  List<String> categories = [];
+
+  String selectedCategory = 'ALL';
+
+  // ============================================================
+  // STATES
+  // ============================================================
+
   bool isLoading = true;
+
   bool hasError = false;
-  bool _searchFocused = false;
+
+  bool searchFocused = false;
+
+  bool isRefreshing = false;
+
+  // ============================================================
+  // CARD HEIGHTS
+  // ============================================================
 
   final List<double> _cardHeights = [
-    345,
-    265,
-    390,
-    305,
+    330,
+    245,
+    300,
+    225,
+    275,
+    255,
   ];
+
+  // ============================================================
+  // INIT
+  // ============================================================
 
   @override
   void initState() {
     super.initState();
 
-    _controller.addListener(_onSearchChanged);
+    _introController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 850,
+      ),
+    );
 
-    _searchFocus.addListener(() {
-      if (!mounted) return;
+    _controller.addListener(
+      _onSearchChanged,
+    );
 
-      setState(() {
-        _searchFocused = _searchFocus.hasFocus;
-      });
-    });
+    _searchFocus.addListener(
+      _onFocusChanged,
+    );
+
+    _introController.forward();
 
     loadData();
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
-    _controller.removeListener(_onSearchChanged);
+    _controller.removeListener(
+      _onSearchChanged,
+    );
+
+    _searchFocus.removeListener(
+      _onFocusChanged,
+    );
+
     _controller.dispose();
+
     _searchFocus.dispose();
+
     _scrollController.dispose();
+
+    _introController.dispose();
 
     super.dispose();
   }
 
   // ============================================================
-  // COLORS
+  // THEME
   // ============================================================
 
   bool get _isDark =>
-      Theme.of(context).brightness == Brightness.dark;
+      Theme.of(context).brightness ==
+          Brightness.dark;
 
   Color get _background =>
       _isDark
@@ -108,11 +176,31 @@ class _SearchScreenState extends State<SearchScreen> {
           : AppColors.lightDivider;
 
   // ============================================================
+  // FOCUS
+  // ============================================================
+
+  void _onFocusChanged() {
+    if (!mounted) return;
+
+    setState(() {
+      searchFocused =
+          _searchFocus.hasFocus;
+    });
+  }
+
+  // ============================================================
   // API
   // ============================================================
 
-  Future<void> loadData() async {
-    if (mounted) {
+  Future<void> loadData({
+    bool refresh = false,
+  }) async {
+    if (refresh) {
+      setState(() {
+        isRefreshing = true;
+        hasError = false;
+      });
+    } else {
       setState(() {
         isLoading = true;
         hasError = false;
@@ -120,10 +208,14 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
-      final apiUrl = dotenv.env['API_URL'];
+      final apiUrl =
+      dotenv.env['API_URL'];
 
-      if (apiUrl == null || apiUrl.trim().isEmpty) {
-        throw Exception('API_URL is missing');
+      if (apiUrl == null ||
+          apiUrl.trim().isEmpty) {
+        throw Exception(
+          'API_URL is missing',
+        );
       }
 
       final response = await http.get(
@@ -136,28 +228,58 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }
 
-      final decoded = jsonDecode(response.body);
+      final decoded =
+      jsonDecode(response.body);
 
-      final List<Map<String, dynamic>> result = [];
+      final List<
+          Map<String, dynamic>> result =
+      [];
+
+      final List<String>
+      apiCategories = [];
+
+      // ========================================================
+      // DIRECT API CATEGORY EXTRACTION
+      // ========================================================
 
       if (decoded is Map &&
           decoded['categories'] is Map) {
-        final categories =
+        final Map categoryMap =
         decoded['categories'] as Map;
 
-        categories.forEach(
+        categoryMap.forEach(
               (category, value) {
-            if (value is Map &&
-                value['wallpapers'] is List) {
-              final images =
-              value['wallpapers'] as List;
+            final categoryName =
+            category.toString().trim();
 
-              for (final image in images) {
+            if (categoryName.isEmpty) {
+              return;
+            }
+
+            // Add category directly from API.
+            apiCategories.add(
+              categoryName,
+            );
+
+            // Get wallpapers for category.
+            if (value is Map &&
+                value['wallpapers']
+                is List) {
+              final images =
+              value['wallpapers']
+              as List;
+
+              for (final image
+              in images) {
                 if (image is String &&
-                    image.trim().isNotEmpty) {
+                    image
+                        .trim()
+                        .isNotEmpty) {
                   result.add({
-                    'image': image,
-                    'category': category.toString(),
+                    'image':
+                    image.trim(),
+                    'category':
+                    categoryName,
                   });
                 }
               }
@@ -166,13 +288,50 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }
 
+      // ========================================================
+      // REMOVE DUPLICATE CATEGORIES
+      // ========================================================
+
+      final uniqueCategories =
+      <String>[];
+
+      final seen =
+      <String>{};
+
+      for (final category
+      in apiCategories) {
+        final normalized =
+        category.toLowerCase();
+
+        if (!seen.contains(
+          normalized,
+        )) {
+          seen.add(normalized);
+
+          uniqueCategories.add(
+            category,
+          );
+        }
+      }
+
       if (!mounted) return;
 
       setState(() {
         wallpapers = result;
-        filtered = result;
+
+        categories = [
+          'ALL',
+          ...uniqueCategories,
+        ];
+
         isLoading = false;
+        isRefreshing = false;
+        hasError = false;
       });
+
+      // Apply current search/category
+      // after fresh API data arrives.
+      _applyFilters();
     } catch (error) {
       debugPrint(
         'Search API error: $error',
@@ -182,6 +341,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
       setState(() {
         isLoading = false;
+        isRefreshing = false;
         hasError = true;
       });
     }
@@ -192,37 +352,72 @@ class _SearchScreenState extends State<SearchScreen> {
   // ============================================================
 
   void _onSearchChanged() {
+    _applyFilters();
+  }
+
+  // ============================================================
+  // FILTER
+  // ============================================================
+
+  void _applyFilters() {
     final query = _controller.text
         .trim()
         .toLowerCase();
 
-    if (query.isEmpty) {
-      if (!mounted) return;
-
-      setState(() {
-        filtered = wallpapers;
-      });
-
-      return;
-    }
-
-    final results = wallpapers.where(
+    final results =
+    wallpapers.where(
           (item) {
-        final category = item['category']
-            .toString()
-            .toLowerCase();
+        final category =
+            item['category']
+                ?.toString() ??
+                '';
 
-        final image = item['image']
-            .toString()
-            .toLowerCase();
+        final image =
+            item['image']
+                ?.toString() ??
+                '';
 
-        final name = getWallpaperName(
-          item['image'].toString(),
-        ).toLowerCase();
+        final title =
+        getWallpaperName(
+          image,
+        );
 
-        return category.contains(query) ||
-            image.contains(query) ||
-            name.contains(query);
+        // ------------------------------------------------------
+        // CATEGORY
+        // ------------------------------------------------------
+
+        final categoryMatches =
+            selectedCategory ==
+                'ALL' ||
+                category.toLowerCase() ==
+                    selectedCategory
+                        .toLowerCase();
+
+        if (!categoryMatches) {
+          return false;
+        }
+
+        // ------------------------------------------------------
+        // EMPTY SEARCH
+        // ------------------------------------------------------
+
+        if (query.isEmpty) {
+          return true;
+        }
+
+        // ------------------------------------------------------
+        // SEARCH
+        // ------------------------------------------------------
+
+        return category
+            .toLowerCase()
+            .contains(query) ||
+            title
+                .toLowerCase()
+                .contains(query) ||
+            image
+                .toLowerCase()
+                .contains(query);
       },
     ).toList();
 
@@ -233,10 +428,41 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  // ============================================================
+  // CATEGORY
+  // ============================================================
+
+  void _selectCategory(
+      String category,
+      ) {
+    if (selectedCategory ==
+        category) {
+      return;
+    }
+
+    setState(() {
+      selectedCategory =
+          category;
+    });
+
+    _applyFilters();
+  }
+
+  // ============================================================
+  // CLEAR SEARCH
+  // ============================================================
+
   void _clearSearch() {
     _controller.clear();
+
     _searchFocus.unfocus();
+
+    _applyFilters();
   }
+
+  // ============================================================
+  // OPEN SEARCH
+  // ============================================================
 
   void _openSearch() {
     _searchFocus.requestFocus();
@@ -247,48 +473,81 @@ class _SearchScreenState extends State<SearchScreen> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     return Scaffold(
-      backgroundColor: _background,
-      resizeToAvoidBottomInset: true,
+      backgroundColor:
+      _background,
 
-      body: Stack(
-        children: [
-          // ------------------------------------------------------
-          // MAIN CONTENT
-          // ------------------------------------------------------
+      // IMPORTANT:
+      // No AppBar.
+      // No top navigation.
+      // No extra header.
+      body: SafeArea(
+        child: RefreshIndicator(
+          color:
+          AppColors.accent,
 
-          SafeArea(
-            child: CustomScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
+          backgroundColor:
+          _surface,
+
+          onRefresh: () =>
+              loadData(
+                refresh: true,
               ),
-              cacheExtent: 700,
 
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _buildHeader(),
-                ),
+          child:
+          CustomScrollView(
+            controller:
+            _scrollController,
 
-                if (isLoading)
-                  _buildLoadingGrid()
-                else if (hasError)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildErrorState(),
-                  )
-                else if (filtered.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _buildEmptyState(),
-                    )
-                  else
-                    _buildWallpaperGrid(),
-              ],
+            physics:
+            const BouncingScrollPhysics(
+              parent:
+              AlwaysScrollableScrollPhysics(),
             ),
+
+            cacheExtent: 900,
+
+            slivers: [
+              // ------------------------------------------------
+              // ONLY HEADER
+              // ------------------------------------------------
+
+              SliverToBoxAdapter(
+                child:
+                _buildHeader(),
+              ),
+
+              // ------------------------------------------------
+              // CONTENT
+              // ------------------------------------------------
+
+              if (isLoading)
+                _buildLoading()
+
+              else if (hasError)
+                SliverFillRemaining(
+                  hasScrollBody:
+                  false,
+                  child:
+                  _buildError(),
+                )
+
+              else if (filtered.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody:
+                    false,
+                    child:
+                    _buildEmpty(),
+                  )
+
+                else
+                  _buildWallpaperFeed(),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -298,443 +557,443 @@ class _SearchScreenState extends State<SearchScreen> {
   // ============================================================
 
   Widget _buildHeader() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20.w,
-        18.h,
-        20.w,
-        22.h,
+    return AnimatedBuilder(
+      animation:
+      CurvedAnimation(
+        parent:
+        _introController,
+        curve:
+        Curves.easeOutCubic,
       ),
-      child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          _buildTopBar(),
 
-          SizedBox(height: 12.h),
+      builder:
+          (context, child) {
+        final value =
+            _introController.value;
 
-          _buildTopSearch(),
+        return Opacity(
+          opacity: value,
 
-          SizedBox(height: 27.h),
+          child:
+          Transform.translate(
+            offset: Offset(
+              0,
+              24 * (1 - value),
+            ),
 
-          Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Text(
-                  'DISCOVER',
-                  style: GoogleFonts.bebasNeue(
-                    color: _primary,
-                    fontSize: 62.sp,
-                    height: .78,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-
-              Container(
-                margin: EdgeInsets.only(
-                  bottom: 5.h,
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: 10.w,
-                  vertical: 7.h,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.accent
-                      .withOpacity(.10),
-                  borderRadius:
-                  BorderRadius.circular(12.r),
-                  border: Border.all(
-                    color: AppColors.accent
-                        .withOpacity(.22),
-                  ),
-                ),
-                child: Text(
-                  '${filtered.length}',
-                  style: GoogleFonts.manrope(
-                    color: AppColors.accent,
-                    fontSize: 10.sp,
-                    fontWeight:
-                    FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+            child: child,
           ),
+        );
+      },
 
-          SizedBox(height: 10.h),
+      child: Padding(
+        padding:
+        EdgeInsets.fromLTRB(
+          16.w,
+          25.h,
+          16.w,
+          6.h,
+        ),
 
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+
+          children: [
+            // ==================================================
+            // ONLY MAIN HEADING
+            // ==================================================
+
+            Text(
+              'FIND YOUR VIBE',
+
+              style:
+              GoogleFonts.bebasNeue(
+                color:
+                _primary,
+
+                fontSize:
+                48.sp,
+
+                height:
+                .84,
+
+                letterSpacing:
+                1.4,
+              ),
+            ),
+
+            SizedBox(
+              height: 18.h,
+            ),
+
+            // ==================================================
+            // SEARCH
+            // ==================================================
+
+            _buildSearchBar(),
+
+            SizedBox(
+              height: 13.h,
+            ),
+
+            // ==================================================
+            // API CATEGORIES
+            // ==================================================
+
+            _buildCategoryTags(),
+
+            SizedBox(
+              height: 8.h,
+            ),
+
+            // ==================================================
+            // SMALL META ROW
+            // ==================================================
+
+            _buildMetaRow(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // META
+  // ============================================================
+
+  Widget _buildMetaRow() {
+    return AnimatedSwitcher(
+      duration:
+      const Duration(
+        milliseconds: 250,
+      ),
+
+      child: Row(
+        key: ValueKey(
+          '$selectedCategory-${filtered.length}',
+        ),
+
+        children: [
           Text(
-            'Find something that feels like you.',
-            style: GoogleFonts.manrope(
-              color: _secondary,
-              fontSize: 13.sp,
-              height: 1.5,
-              fontWeight: FontWeight.w500,
+            selectedCategory
+                .toUpperCase(),
+
+            style:
+            GoogleFonts.manrope(
+              color:
+              _muted,
+
+              fontSize:
+              7.5.sp,
+
+              fontWeight:
+              FontWeight.w700,
+
+              letterSpacing:
+              1.2,
             ),
           ),
 
-          SizedBox(height: 22.h),
+          const Spacer(),
 
-          _buildQuickFilters(),
+          AnimatedSwitcher(
+            duration:
+            const Duration(
+              milliseconds: 220,
+            ),
+
+            child: Text(
+              '${filtered.length} WALLPAPERS',
+
+              key: ValueKey(
+                filtered.length,
+              ),
+
+              style:
+              GoogleFonts.manrope(
+                color:
+                _secondary,
+
+                fontSize:
+                7.5.sp,
+
+                fontWeight:
+                FontWeight.w700,
+
+                letterSpacing:
+                .8,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   // ============================================================
-  // TOP BAR
+  // SEARCH BAR
   // ============================================================
 
-  Widget _buildTopBar() {
-    return Row(
-      children: [
-        _iconButton(
-          Icons.arrow_back_ios_new_rounded,
-          onTap: () {
-            Navigator.pop(context);
-          },
-        ),
-
-        SizedBox(width: 12.w),
-
-        Expanded(
-          child: Row(
-            children: [
-              Container(
-                width: 7.w,
-                height: 7.w,
-                decoration:
-                const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.accent,
-                ),
-              ),
-
-              SizedBox(width: 8.w),
-
-              Text(
-                'WALLPAPER LAB',
-                style: GoogleFonts.manrope(
-                  color: _secondary,
-                  fontSize: 8.sp,
-                  fontWeight:
-                  FontWeight.w500,
-                  letterSpacing: 1.7,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 10.w,
-            vertical: 7.h,
-          ),
-          decoration: BoxDecoration(
-            color: _surfaceSoft,
-            borderRadius:
-            BorderRadius.circular(12.r),
-          ),
-          child: Text(
-            '4K',
-            style: GoogleFonts.manrope(
-              color: _primary,
-              fontSize: 8.sp,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _iconButton(
-      IconData icon, {
-        required VoidCallback onTap,
-      }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius:
-        BorderRadius.circular(17.r),
-        child: Ink(
-          width: 50.w,
-          height: 50.w,
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius:
-            BorderRadius.circular(17.r),
-            border: Border.all(
-              color: _divider,
-            ),
-          ),
-          child: Icon(
-            icon,
-            color: _primary,
-            size: 17.sp,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // QUICK FILTERS
-  // ============================================================
-
-  Widget _buildQuickFilters() {
-    return SizedBox(
-      height: 38.h,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        physics:
-        const BouncingScrollPhysics(),
-        padding: EdgeInsets.zero,
-        children: [
-          _quickChip(
-            icon: Icons.auto_awesome_rounded,
-            label: 'ALL',
-            active:
-            _controller.text.isEmpty,
-            onTap: _clearSearch,
-          ),
-
-          SizedBox(width: 8.w),
-
-          _quickChip(
-            icon: Icons.trending_up_rounded,
-            label: 'TRENDING',
-            onTap: () {
-              _controller.text = 'trending';
-            },
-          ),
-
-          SizedBox(width: 8.w),
-
-          _quickChip(
-            icon: Icons.phone_android_rounded,
-            label: 'MOBILE',
-            onTap: () {
-              _controller.text = 'mobile';
-            },
-          ),
-
-          SizedBox(width: 8.w),
-
-          _quickChip(
-            icon: Icons.nightlight_round,
-            label: 'DARK',
-            onTap: () {
-              _controller.text = 'dark';
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _quickChip({
-    required IconData icon,
-    required String label,
-    bool active = false,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius:
-        BorderRadius.circular(15.r),
-        child: Ink(
-          padding: EdgeInsets.symmetric(
-            horizontal: 12.w,
-          ),
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.accent
-                .withOpacity(.12)
-                : _surface,
-            borderRadius:
-            BorderRadius.circular(15.r),
-            border: Border.all(
-              color: active
-                  ? AppColors.accent
-                  .withOpacity(.30)
-                  : _divider,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 13.sp,
-                color: active
-                    ? AppColors.accent
-                    : _muted,
-              ),
-
-              SizedBox(width: 6.w),
-
-              Text(
-                label,
-                style: GoogleFonts.manrope(
-                  color: active
-                      ? AppColors.accent
-                      : _secondary,
-                  fontSize: 8.sp,
-                  fontWeight:
-                  FontWeight.w500,
-                  letterSpacing: .8,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // BOTTOM SEARCH BAR
-  // ============================================================
-
-  Widget _buildTopSearch() {
-    final hasText = _controller.text.isNotEmpty;
+  Widget _buildSearchBar() {
+    final hasText =
+        _controller.text
+            .trim()
+            .isNotEmpty;
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      height: _searchFocused ? 58.h : 54.h,
-      padding: EdgeInsets.symmetric(horizontal: 6.w),
-      decoration: BoxDecoration(
-        color: _isDark
-            ? const Color(0xFF171918)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(19.r),
-        border: Border.all(
-          color: _searchFocused
-              ? AppColors.accent.withOpacity(.34)
-              : _divider.withOpacity(.72),
-          width: _searchFocused ? 1.15 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(
-              _isDark ? .16 : .055,
-            ),
-            blurRadius: _searchFocused ? 25 : 15,
-            offset: const Offset(0, 7),
-          ),
-        ],
+      duration:
+      const Duration(
+        milliseconds: 330,
       ),
+
+      curve:
+      Curves.easeOutCubic,
+
+      height:
+      searchFocused
+          ? 64.h
+          : 55.h,
+
+      padding:
+      EdgeInsets.all(6.w),
+
+      decoration:
+      BoxDecoration(
+        color:
+        _surface,
+
+        borderRadius:
+        BorderRadius.circular(
+          22.r,
+        ),
+
+        // ONLY BORDER.
+        //
+        // NO SHADOW.
+        // NO GLOW.
+        border:
+        Border.all(
+          color:
+          searchFocused
+              ? AppColors.accent
+              .withOpacity(.55)
+              : _divider
+              .withOpacity(.65),
+
+          width:
+          searchFocused
+              ? 1.2
+              : 1,
+        ),
+      ),
+
       child: Row(
         children: [
+          // ----------------------------------------------------
+          // SEARCH ICON
+          // ----------------------------------------------------
+
           AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOutCubic,
-            width: 42.w,
-            height: 42.w,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(
-                _searchFocused ? .14 : .085,
-              ),
-              borderRadius: BorderRadius.circular(14.r),
+            duration:
+            const Duration(
+              milliseconds: 280,
             ),
-            child: Icon(
-              Icons.search_rounded,
-              color: _searchFocused
-                  ? AppColors.accent
-                  : _secondary,
-              size: 19.sp,
+
+            curve:
+            Curves.easeOutCubic,
+
+            width:
+            searchFocused
+                ? 49.w
+                : 42.w,
+
+            height:
+            searchFocused
+                ? 49.w
+                : 42.w,
+
+            decoration:
+            BoxDecoration(
+              color:
+              searchFocused
+                  ? AppColors
+                  .accent
+                  .withOpacity(
+                .12,
+              )
+                  : Colors
+                  .transparent,
+
+              borderRadius:
+              BorderRadius.circular(
+                16.r,
+              ),
+            ),
+
+            child:
+            AnimatedSwitcher(
+              duration:
+              const Duration(
+                milliseconds: 200,
+              ),
+
+              transitionBuilder:
+                  (
+                  child,
+                  animation,
+                  ) {
+                return ScaleTransition(
+                  scale: animation,
+                  child:
+                  FadeTransition(
+                    opacity:
+                    animation,
+                    child:
+                    child,
+                  ),
+                );
+              },
+
+              child: Icon(
+                Icons.search_rounded,
+
+                key: ValueKey(
+                  searchFocused,
+                ),
+
+                color:
+                searchFocused
+                    ? AppColors
+                    .accent
+                    : _muted,
+
+                size:
+                20.sp,
+              ),
             ),
           ),
 
-          SizedBox(width: 9.w),
+          SizedBox(
+            width: 8.w,
+          ),
+
+          // ----------------------------------------------------
+          // TEXT FIELD
+          // ----------------------------------------------------
 
           Expanded(
             child: TextField(
-              controller: _controller,
-              focusNode: _searchFocus,
-              textInputAction: TextInputAction.search,
-              cursorColor: AppColors.accent,
-              style: GoogleFonts.manrope(
-                color: _primary,
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w500,
+              controller:
+              _controller,
+
+              focusNode:
+              _searchFocus,
+
+              textInputAction:
+              TextInputAction.search,
+
+              cursorColor:
+              AppColors.accent,
+
+              style:
+              GoogleFonts.manrope(
+                color:
+                _primary,
+
+                fontSize:
+                12.sp,
+
+                fontWeight:
+                FontWeight.w600,
               ),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                hintText: 'Search wallpapers',
-                hintStyle: GoogleFonts.manrope(
-                  color: _muted.withOpacity(.82),
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w500,
+
+              decoration:
+              InputDecoration(
+                border:
+                InputBorder.none,
+
+                enabledBorder:
+                InputBorder.none,
+
+                focusedBorder:
+                InputBorder.none,
+
+                hintText:
+                'Search wallpapers',
+
+                hintStyle:
+                GoogleFonts.manrope(
+                  color:
+                  _muted.withOpacity(
+                    .72,
+                  ),
+
+                  fontSize:
+                  11.sp,
+
+                  fontWeight:
+                  FontWeight.w500,
                 ),
-                contentPadding: EdgeInsets.zero,
+
+                contentPadding:
+                EdgeInsets.zero,
               ),
             ),
           ),
 
+          // ----------------------------------------------------
+          // ACTION BUTTON
+          // ----------------------------------------------------
+
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) {
+            duration:
+            const Duration(
+              milliseconds: 220,
+            ),
+
+            transitionBuilder:
+                (
+                child,
+                animation,
+                ) {
               return ScaleTransition(
                 scale: animation,
-                child: FadeTransition(
-                  opacity: animation,
-                  child: child,
+                child:
+                FadeTransition(
+                  opacity:
+                  animation,
+                  child:
+                  child,
                 ),
               );
             },
+
             child: hasText
-                ? Material(
-              key: const ValueKey('clear'),
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _clearSearch,
-                borderRadius: BorderRadius.circular(14.r),
-                child: SizedBox(
-                  width: 40.w,
-                  height: 40.w,
-                  child: Icon(
-                    Icons.close_rounded,
-                    color: _muted,
-                    size: 18.sp,
-                  ),
-                ),
+                ? _searchAction(
+              key:
+              const ValueKey(
+                'clear',
               ),
+
+              icon:
+              Icons.close_rounded,
+
+              onTap:
+              _clearSearch,
             )
-                : Material(
-              key: const ValueKey('searchAction'),
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _openSearch,
-                borderRadius: BorderRadius.circular(14.r),
-                child: Container(
-                  width: 40.w,
-                  height: 40.w,
-                  decoration: BoxDecoration(
-                    color: _surfaceSoft,
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_rounded,
-                    color: _secondary,
-                    size: 16.sp,
-                  ),
-                ),
+                : _searchAction(
+              key:
+              const ValueKey(
+                'arrow',
               ),
+
+              icon:
+              Icons
+                  .arrow_forward_rounded,
+
+              onTap:
+              _openSearch,
             ),
           ),
         ],
@@ -743,113 +1002,134 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   // ============================================================
-  // GRID
+  // SEARCH ACTION
   // ============================================================
 
-  SliverPadding _buildWallpaperGrid() {
-    return SliverPadding(
-      padding: EdgeInsets.symmetric(
-        horizontal: 16.w,
-      ),
+  Widget _searchAction({
+    required Key key,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      key: key,
 
-      sliver: SliverMasonryGrid.count(
-        crossAxisCount: 2,
+      color:
+      Colors.transparent,
 
-        mainAxisSpacing: 10.h,
-        crossAxisSpacing: 10.w,
+      child: InkWell(
+        onTap: onTap,
 
-        childCount: filtered.length,
+        borderRadius:
+        BorderRadius.circular(
+          15.r,
+        ),
 
-        itemBuilder: (context, index) {
-          final item = filtered[index];
+        child: Container(
+          width: 42.w,
+          height: 42.w,
 
-          final image =
-          item['image'].toString();
-
-          final category =
-          item['category'].toString();
-
-          return TweenAnimationBuilder<double>(
-            key: ValueKey('entry-$image'),
-            tween: Tween<double>(begin: 0.0, end: 1.0),
-            duration: Duration(
-              milliseconds: 420 + ((index % 6) * 45),
+          decoration:
+          BoxDecoration(
+            color:
+            _isDark
+                ? Colors.white
+                .withOpacity(
+              .04,
+            )
+                : Colors.black
+                .withOpacity(
+              .035,
             ),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, 14 * (1 - value)),
-                  child: Transform.scale(
-                    scale: .975 + (.025 * value),
-                    child: child,
-                  ),
-                ),
+
+            borderRadius:
+            BorderRadius.circular(
+              15.r,
+            ),
+          ),
+
+          child: Icon(
+            icon,
+
+            color:
+            _secondary,
+
+            size:
+            17.sp,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // API CATEGORY TAGS
+  // ============================================================
+
+  Widget _buildCategoryTags() {
+    if (categories.isEmpty) {
+      return const SizedBox(
+        height: 40,
+      );
+    }
+
+    return SizedBox(
+      height: 40.h,
+
+      child: ListView.separated(
+        scrollDirection:
+        Axis.horizontal,
+
+        physics:
+        const BouncingScrollPhysics(),
+
+        padding:
+        EdgeInsets.zero,
+
+        itemCount:
+        categories.length,
+
+        separatorBuilder:
+            (_, __) {
+          return SizedBox(
+            width: 7.w,
+          );
+        },
+
+        itemBuilder:
+            (context, index) {
+          final category =
+          categories[index];
+
+          final active =
+              selectedCategory
+                  .toLowerCase() ==
+                  category
+                      .toLowerCase();
+
+          return _CategoryTag(
+            category:
+            category,
+
+            active:
+            active,
+
+            primary:
+            _primary,
+
+            secondary:
+            _secondary,
+
+            surface:
+            _surface,
+
+            divider:
+            _divider,
+
+            onTap: () {
+              _selectCategory(
+                category,
               );
             },
-            child: RepaintBoundary(
-              key: ValueKey(image),
-              child: _WallpaperCard(
-                image: image,
-                category: category,
-                height:
-                _cardHeights[
-                index %
-                    _cardHeights.length]
-                    .h,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    PageRouteBuilder(
-                      transitionDuration:
-                      const Duration(
-                        milliseconds: 280,
-                      ),
-                      reverseTransitionDuration:
-                      const Duration(
-                        milliseconds: 220,
-                      ),
-                      pageBuilder: (
-                          context,
-                          animation,
-                          secondaryAnimation,
-                          ) {
-                        return PreviewScreen(
-                          imageUrl: image,
-                          category: category,
-                        );
-                      },
-                      transitionsBuilder: (
-                          context,
-                          animation,
-                          secondaryAnimation,
-                          child,
-                          ) {
-                        final curved =
-                        CurvedAnimation(
-                          parent: animation,
-                          curve:
-                          Curves.easeOutCubic,
-                        );
-
-                        return FadeTransition(
-                          opacity: curved,
-                          child: ScaleTransition(
-                            scale:
-                            Tween<double>(
-                              begin: .985,
-                              end: 1,
-                            ).animate(curved),
-                            child: child,
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
           );
         },
       ),
@@ -857,212 +1137,204 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   // ============================================================
-  // WALLPAPER CARD
+  // WALLPAPER FEED
   // ============================================================
 
-  Widget _WallpaperCard({
-    required String image,
-    required String category,
-    required double height,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
+  SliverPadding
+  _buildWallpaperFeed() {
+    return SliverPadding(
+      padding:
+      EdgeInsets.fromLTRB(
+        10.w,
+        10.h,
+        10.w,
+        30.h,
+      ),
 
-      child: InkWell(
-        onTap: onTap,
-        borderRadius:
-        BorderRadius.circular(26.r),
+      sliver: SliverList(
+        delegate:
+        SliverChildBuilderDelegate(
+              (context, index) {
+            final item =
+            filtered[index];
 
-        child: Ink(
-          height: height,
+            final image =
+                item['image']
+                    ?.toString() ??
+                    '';
 
-          decoration: BoxDecoration(
-            color: _surfaceSoft,
-            borderRadius:
-            BorderRadius.circular(26.r),
-          ),
+            final category =
+                item['category']
+                    ?.toString() ??
+                    '';
 
-          child: ClipRRect(
-            borderRadius:
-            BorderRadius.circular(26.r),
+            final title =
+            getWallpaperName(
+              image,
+            );
 
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // ------------------------------------------------
-                // IMAGE
-                // ------------------------------------------------
+            final height =
+                _cardHeights[
+                index %
+                    _cardHeights
+                        .length]
+                    .h;
 
-                Image.network(
-                  image,
+            return TweenAnimationBuilder<
+                double>(
+              key: ValueKey(
+                '$image-$index',
+              ),
 
-                  width: double.infinity,
-                  height: height,
+              tween:
+              Tween<double>(
+                begin: 0,
+                end: 1,
+              ),
 
-                  fit: BoxFit.cover,
+              duration: Duration(
+                milliseconds:
+                420 +
+                    ((index % 6) * 70),
+              ),
 
-                  filterQuality:
-                  FilterQuality.medium,
+              curve:
+              Curves.easeOutCubic,
 
-                  cacheWidth: 900,
+              builder:
+                  (
+                  context,
+                  value,
+                  child,
+                  ) {
+                return Opacity(
+                  opacity: value,
 
-                  gaplessPlayback: true,
+                  child:
+                  Transform.translate(
+                    offset: Offset(
+                      0,
+                      22 *
+                          (1 - value),
+                    ),
 
-                  errorBuilder: (
-                      context,
-                      error,
-                      stackTrace,
-                      ) {
-                    return Container(
-                      color: _surfaceSoft,
-                      child: Center(
-                        child: Icon(
-                          Icons
-                              .image_not_supported_outlined,
-                          color: _muted,
-                          size: 28.sp,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                    child:
+                    Transform.scale(
+                      scale:
+                      .965 +
+                          (.035 *
+                              value),
 
-                // ------------------------------------------------
-                // DARK OVERLAY
-                // ------------------------------------------------
-
-                const Positioned.fill(
-                  child: DecoratedBox(
-                    decoration:
-                    BoxDecoration(
-                      gradient:
-                      LinearGradient(
-                        begin:
-                        Alignment.topCenter,
-                        end:
-                        Alignment.bottomCenter,
-                        stops: [
-                          0.0,
-                          0.45,
-                          1.0,
-                        ],
-                        colors: [
-                          Color(0x05000000),
-                          Color(0x15000000),
-                          Color(0xB8000000),
-                        ],
-                      ),
+                      child: child,
                     ),
                   ),
-                ),
+                );
+              },
 
-                // ------------------------------------------------
-                // CATEGORY
-                // ------------------------------------------------
+              child:
+              _WallpaperCard(
+                image:
+                image,
 
-                Positioned(
-                  top: 12.h,
-                  left: 12.w,
-                  child: Container(
-                    padding:
-                    EdgeInsets.symmetric(
-                      horizontal: 9.w,
-                      vertical: 6.h,
-                    ),
+                title:
+                title,
 
-                    decoration:
-                    BoxDecoration(
-                      color: Colors.black
-                          .withOpacity(.30),
+                category:
+                category,
 
-                      borderRadius:
-                      BorderRadius.circular(
-                        12.r,
-                      ),
+                height:
+                height,
 
-                      border: Border.all(
-                        color: Colors.white
-                            .withOpacity(.12),
-                      ),
-                    ),
+                index:
+                index,
 
-                    child: Text(
-                      category.toUpperCase(),
-                      style: GoogleFonts.manrope(
-                        color: Colors.white
-                            .withOpacity(.90),
-                        fontSize: 7.sp,
-                        fontWeight:
-                        FontWeight.w500,
-                        letterSpacing: .9,
-                      ),
-                    ),
-                  ),
-                ),
+                muted:
+                _muted,
 
-                // ------------------------------------------------
-                // BOTTOM INFORMATION
-                // ------------------------------------------------
+                onTap: () {
+                  _openPreview(
+                    image,
+                    category,
+                  );
+                },
+              ),
+            );
+          },
 
-                Positioned(
-                  left: 13.w,
-                  right: 13.w,
-                  bottom: 13.h,
-
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          getWallpaperName(
-                            image,
-                          ),
-                          maxLines: 1,
-                          overflow:
-                          TextOverflow.ellipsis,
-
-                          style:
-                          GoogleFonts.manrope(
-                            color: Colors.white,
-                            fontSize: 9.sp,
-                            fontWeight:
-                            FontWeight.w500,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(width: 8.w),
-
-                      Container(
-                        width: 30.w,
-                        height: 30.w,
-
-                        decoration:
-                        BoxDecoration(
-                          color: Colors.black
-                              .withOpacity(.30),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white
-                                .withOpacity(.12),
-                          ),
-                        ),
-
-                        child: Icon(
-                          Icons
-                              .arrow_outward_rounded,
-                          color: Colors.white
-                              .withOpacity(.90),
-                          size: 12.sp,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          childCount:
+          filtered.length,
         ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // OPEN PREVIEW
+  // ============================================================
+
+  void _openPreview(
+      String image,
+      String category,
+      ) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        transitionDuration:
+        const Duration(
+          milliseconds: 400,
+        ),
+
+        reverseTransitionDuration:
+        const Duration(
+          milliseconds: 280,
+        ),
+
+        pageBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            ) {
+          return PreviewScreen(
+            imageUrl:
+            image,
+
+            category:
+            category,
+          );
+        },
+
+        transitionsBuilder: (
+            context,
+            animation,
+            secondaryAnimation,
+            child,
+            ) {
+          final curved =
+          CurvedAnimation(
+            parent: animation,
+            curve:
+            Curves.easeOutCubic,
+          );
+
+          return FadeTransition(
+            opacity:
+            curved,
+
+            child:
+            ScaleTransition(
+              scale:
+              Tween<double>(
+                begin: .965,
+                end: 1,
+              ).animate(
+                curved,
+              ),
+
+              child:
+              child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -1071,102 +1343,46 @@ class _SearchScreenState extends State<SearchScreen> {
   // LOADING
   // ============================================================
 
-  SliverPadding _buildLoadingGrid() {
+  SliverPadding _buildLoading() {
     return SliverPadding(
-      padding: EdgeInsets.symmetric(
-        horizontal: 16.w,
+      padding:
+      EdgeInsets.fromLTRB(
+        10.w,
+        10.h,
+        10.w,
+        30.h,
       ),
 
-      sliver: SliverMasonryGrid.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10.h,
-        crossAxisSpacing: 10.w,
-        childCount: 6,
+      sliver: SliverList(
+        delegate:
+        SliverChildBuilderDelegate(
+              (context, index) {
+            final height =
+                _cardHeights[
+                index %
+                    _cardHeights
+                        .length]
+                    .h;
 
-        itemBuilder: (
-            context,
-            index,
-            ) {
-          return _SkeletonCard(
-            height:
-            _cardHeights[
-            index %
-                _cardHeights.length]
-                .h,
-          );
-        },
-      ),
-    );
-  }
-
-  // ============================================================
-  // SKELETON
-  // ============================================================
-
-  Widget _SkeletonCard({
-    required double height,
-  }) {
-    return Container(
-      height: height,
-
-      decoration: BoxDecoration(
-        color: _surfaceSoft,
-        borderRadius:
-        BorderRadius.circular(26.r),
-      ),
-
-      child: Stack(
-        children: [
-          Positioned(
-            left: 13.w,
-            top: 13.h,
-            child: Container(
-              width: 62.w,
-              height: 22.h,
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius:
-                BorderRadius.circular(
-                  10.r,
-                ),
+            return Padding(
+              padding:
+              EdgeInsets.only(
+                bottom: 7.h,
               ),
-            ),
-          ),
 
-          Positioned(
-            left: 13.w,
-            right: 13.w,
-            bottom: 13.h,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 12.h,
-                    decoration: BoxDecoration(
-                      color: _surface,
-                      borderRadius:
-                      BorderRadius.circular(
-                        8.r,
-                      ),
-                    ),
-                  ),
-                ),
+              child:
+              _LoadingCard(
+                height:
+                height,
 
-                SizedBox(width: 8.w),
+                dark:
+                _isDark,
+              ),
+            );
+          },
 
-                Container(
-                  width: 30.w,
-                  height: 30.w,
-                  decoration:
-                  BoxDecoration(
-                    color: _surface,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          childCount: 5,
+        ),
       ),
     );
   }
@@ -1175,11 +1391,12 @@ class _SearchScreenState extends State<SearchScreen> {
   // EMPTY
   // ============================================================
 
-  Widget _buildEmptyState() {
+  Widget _buildEmpty() {
     return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 35.w,
+        padding:
+        EdgeInsets.symmetric(
+          horizontal: 30.w,
         ),
 
         child: Column(
@@ -1187,79 +1404,113 @@ class _SearchScreenState extends State<SearchScreen> {
           MainAxisAlignment.center,
 
           children: [
-            Container(
-              width: 76.w,
-              height: 76.w,
+            Icon(
+              Icons
+                  .search_off_rounded,
 
-              decoration: BoxDecoration(
-                color: _surfaceSoft,
-                borderRadius:
-                BorderRadius.circular(25.r),
-              ),
+              color:
+              _muted,
 
-              child: Icon(
-                Icons.search_off_rounded,
-                color: _muted,
-                size: 32.sp,
-              ),
+              size:
+              34.sp,
             ),
 
-            SizedBox(height: 20.h),
+            SizedBox(
+              height: 15.h,
+            ),
 
             Text(
-              'NOTHING FOUND',
-              style: GoogleFonts.bebasNeue(
-                color: _primary,
-                fontSize: 32.sp,
-                letterSpacing: 1.2,
+              'NOTHING HERE',
+
+              style:
+              GoogleFonts
+                  .bebasNeue(
+                color:
+                _primary,
+
+                fontSize:
+                32.sp,
+
+                letterSpacing:
+                1.2,
               ),
             ),
 
-            SizedBox(height: 7.h),
+            SizedBox(
+              height: 6.h,
+            ),
 
             Text(
-              'Try another wallpaper name or collection.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
-                color: _secondary,
-                fontSize: 12.sp,
-                height: 1.6,
+              'Try another search or choose a different category.',
+
+              textAlign:
+              TextAlign.center,
+
+              style:
+              GoogleFonts.manrope(
+                color:
+                _secondary,
+
+                fontSize:
+                11.sp,
+
+                height:
+                1.5,
               ),
             ),
 
-            SizedBox(height: 18.h),
+            SizedBox(
+              height: 16.h,
+            ),
 
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _clearSearch,
-                borderRadius:
-                BorderRadius.circular(15.r),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedCategory =
+                  'ALL';
+                });
 
-                child: Ink(
-                  padding:
-                  EdgeInsets.symmetric(
-                    horizontal: 17.w,
-                    vertical: 11.h,
+                _clearSearch();
+              },
+
+              child:
+              Container(
+                padding:
+                EdgeInsets.symmetric(
+                  horizontal:
+                  18.w,
+
+                  vertical:
+                  11.h,
+                ),
+
+                decoration:
+                BoxDecoration(
+                  color:
+                  AppColors.accent,
+
+                  borderRadius:
+                  BorderRadius.circular(
+                    15.r,
                   ),
+                ),
 
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius:
-                    BorderRadius.circular(
-                      15.r,
-                    ),
-                  ),
+                child: Text(
+                  'RESET',
 
-                  child: Text(
-                    'CLEAR SEARCH',
-                    style: GoogleFonts.manrope(
-                      color: Colors.white,
-                      fontSize: 8.sp,
-                      fontWeight:
-                      FontWeight.w500,
-                      letterSpacing: 1,
-                    ),
+                  style:
+                  GoogleFonts.manrope(
+                    color:
+                    Colors.white,
+
+                    fontSize:
+                    8.sp,
+
+                    fontWeight:
+                    FontWeight.w700,
+
+                    letterSpacing:
+                    1,
                   ),
                 ),
               ),
@@ -1274,11 +1525,12 @@ class _SearchScreenState extends State<SearchScreen> {
   // ERROR
   // ============================================================
 
-  Widget _buildErrorState() {
+  Widget _buildError() {
     return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 35.w,
+        padding:
+        EdgeInsets.symmetric(
+          horizontal: 30.w,
         ),
 
         child: Column(
@@ -1286,79 +1538,107 @@ class _SearchScreenState extends State<SearchScreen> {
           MainAxisAlignment.center,
 
           children: [
-            Container(
-              width: 76.w,
-              height: 76.w,
+            Icon(
+              Icons
+                  .cloud_off_rounded,
 
-              decoration: BoxDecoration(
-                color: _surfaceSoft,
-                borderRadius:
-                BorderRadius.circular(25.r),
-              ),
+              color:
+              _muted,
 
-              child: Icon(
-                Icons.cloud_off_rounded,
-                color: _muted,
-                size: 32.sp,
-              ),
+              size:
+              34.sp,
             ),
 
-            SizedBox(height: 20.h),
+            SizedBox(
+              height: 15.h,
+            ),
 
             Text(
-              'UNABLE TO LOAD',
-              style: GoogleFonts.bebasNeue(
-                color: _primary,
-                fontSize: 31.sp,
-                letterSpacing: 1.2,
+              'CAN\'T LOAD',
+
+              style:
+              GoogleFonts
+                  .bebasNeue(
+                color:
+                _primary,
+
+                fontSize:
+                32.sp,
+
+                letterSpacing:
+                1.2,
               ),
             ),
 
-            SizedBox(height: 7.h),
+            SizedBox(
+              height: 6.h,
+            ),
 
             Text(
-              'Something went wrong while loading the collection.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
-                color: _secondary,
-                fontSize: 12.sp,
-                height: 1.6,
+              'Something went wrong while loading wallpapers.',
+
+              textAlign:
+              TextAlign.center,
+
+              style:
+              GoogleFonts.manrope(
+                color:
+                _secondary,
+
+                fontSize:
+                11.sp,
+
+                height:
+                1.5,
               ),
             ),
 
-            SizedBox(height: 20.h),
+            SizedBox(
+              height: 17.h,
+            ),
 
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: loadData,
-                borderRadius:
-                BorderRadius.circular(15.r),
+            GestureDetector(
+              onTap:
+                  () => loadData(),
 
-                child: Ink(
-                  padding:
-                  EdgeInsets.symmetric(
-                    horizontal: 20.w,
-                    vertical: 12.h,
+              child:
+              Container(
+                padding:
+                EdgeInsets.symmetric(
+                  horizontal:
+                  18.w,
+
+                  vertical:
+                  11.h,
+                ),
+
+                decoration:
+                BoxDecoration(
+                  color:
+                  AppColors.accent,
+
+                  borderRadius:
+                  BorderRadius.circular(
+                    15.r,
                   ),
+                ),
 
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius:
-                    BorderRadius.circular(
-                      15.r,
-                    ),
-                  ),
+                child: Text(
+                  'TRY AGAIN',
 
-                  child: Text(
-                    'TRY AGAIN',
-                    style: GoogleFonts.manrope(
-                      color: Colors.white,
-                      fontSize: 9.sp,
-                      fontWeight:
-                      FontWeight.w500,
-                      letterSpacing: 1.1,
-                    ),
+                  style:
+                  GoogleFonts.manrope(
+                    color:
+                    Colors.white,
+
+                    fontSize:
+                    8.sp,
+
+                    fontWeight:
+                    FontWeight.w700,
+
+                    letterSpacing:
+                    1,
                   ),
                 ),
               ),
@@ -1379,36 +1659,859 @@ class _SearchScreenState extends State<SearchScreen> {
     String fileName =
         url.split('/').last;
 
-    fileName = fileName.replaceAll(
-      RegExp(
-        r'\.(jpg|jpeg|png|webp)$',
-        caseSensitive: false,
-      ),
-      '',
-    );
+    fileName =
+        fileName.replaceAll(
+          RegExp(
+            r'\.(jpg|jpeg|png|webp)$',
+            caseSensitive:
+            false,
+          ),
+          '',
+        );
 
-    fileName = fileName.replaceAll(
-      RegExp(
-        r'-\d+x\d+-\d+$',
-      ),
-      '',
-    );
+    fileName =
+        fileName.replaceAll(
+          RegExp(
+            r'-\d+x\d+-\d+$',
+          ),
+          '',
+        );
 
-    fileName = fileName.replaceAll(
-      '-',
-      ' ',
-    );
+    fileName =
+        fileName.replaceAll(
+          '-',
+          ' ',
+        );
+
+    fileName =
+        fileName.replaceAll(
+          '_',
+          ' ',
+        );
 
     return fileName
         .split(' ')
         .where(
-          (word) => word.isNotEmpty,
+          (word) =>
+      word.isNotEmpty,
     )
         .map(
-          (word) =>
-      word[0].toUpperCase() +
-          word.substring(1),
+          (word) {
+        if (word.isEmpty) {
+          return '';
+        }
+
+        return word[0]
+            .toUpperCase() +
+            word.substring(1);
+      },
     )
         .join(' ');
+  }
+}
+
+// =================================================================
+// CATEGORY TAG
+// =================================================================
+
+class _CategoryTag
+    extends StatelessWidget {
+  final String category;
+
+  final bool active;
+
+  final Color primary;
+  final Color secondary;
+  final Color surface;
+  final Color divider;
+
+  final VoidCallback onTap;
+
+  const _CategoryTag({
+    required this.category,
+    required this.active,
+    required this.primary,
+    required this.secondary,
+    required this.surface,
+    required this.divider,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return AnimatedContainer(
+      duration:
+      const Duration(
+        milliseconds: 260,
+      ),
+
+      curve:
+      Curves.easeOutCubic,
+
+      padding:
+      EdgeInsets.symmetric(
+        horizontal: 15.w,
+      ),
+
+      decoration:
+      BoxDecoration(
+        color: active
+            ? AppColors.accent
+            : surface,
+
+        borderRadius:
+        BorderRadius.circular(
+          18.r,
+        ),
+
+        border:
+        Border.all(
+          color: active
+              ? AppColors.accent
+              : divider.withOpacity(
+            .65,
+          ),
+        ),
+      ),
+
+      child: Material(
+        color:
+        Colors.transparent,
+
+        child: InkWell(
+          onTap: onTap,
+
+          borderRadius:
+          BorderRadius.circular(
+            18.r,
+          ),
+
+          child: Row(
+            mainAxisSize:
+            MainAxisSize.min,
+
+            children: [
+              AnimatedSwitcher(
+                duration:
+                const Duration(
+                  milliseconds: 180,
+                ),
+
+                child: active
+                    ? Padding(
+                  key:
+                  const ValueKey(
+                    'selected',
+                  ),
+
+                  padding:
+                  EdgeInsets.only(
+                    right:
+                    5.w,
+                  ),
+
+                  child:
+                  Icon(
+                    Icons
+                        .check_rounded,
+
+                    color:
+                    Colors.white,
+
+                    size:
+                    12.sp,
+                  ),
+                )
+                    : const SizedBox(
+                  key:
+                  ValueKey(
+                    'empty',
+                  ),
+                  width: 0,
+                ),
+              ),
+
+              AnimatedDefaultTextStyle(
+                duration:
+                const Duration(
+                  milliseconds: 220,
+                ),
+
+                style:
+                GoogleFonts.manrope(
+                  color: active
+                      ? Colors.white
+                      : secondary,
+
+                  fontSize:
+                  8.sp,
+
+                  fontWeight:
+                  FontWeight.w700,
+
+                  letterSpacing:
+                  .8,
+                ),
+
+                child: Text(
+                  category
+                      .toUpperCase(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =================================================================
+// WALLPAPER CARD
+// =================================================================
+
+class _WallpaperCard
+    extends StatefulWidget {
+  final String image;
+  final String title;
+  final String category;
+  final double height;
+  final int index;
+  final Color muted;
+  final VoidCallback onTap;
+
+  const _WallpaperCard({
+    required this.image,
+    required this.title,
+    required this.category,
+    required this.height,
+    required this.index,
+    required this.muted,
+    required this.onTap,
+  });
+
+  @override
+  State<_WallpaperCard> createState() =>
+      _WallpaperCardState();
+}
+
+class _WallpaperCardState
+    extends State<_WallpaperCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController
+  _motionController;
+
+  bool pressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _motionController =
+        AnimationController(
+          vsync: this,
+
+          duration: Duration(
+            seconds:
+            12 +
+                (widget.index %
+                    5),
+          ),
+        );
+
+    _motionController.repeat(
+      reverse: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _motionController.dispose();
+
+    super.dispose();
+  }
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Padding(
+      padding:
+      EdgeInsets.only(
+        bottom: 7.h,
+      ),
+
+      child:
+      GestureDetector(
+        onTapDown: (_) {
+          setState(() {
+            pressed = true;
+          });
+        },
+
+        onTapCancel: () {
+          setState(() {
+            pressed = false;
+          });
+        },
+
+        onTapUp: (_) {
+          setState(() {
+            pressed = false;
+          });
+
+          widget.onTap();
+        },
+
+        child:
+        AnimatedScale(
+          scale:
+          pressed
+              ? .975
+              : 1,
+
+          duration:
+          const Duration(
+            milliseconds: 140,
+          ),
+
+          curve:
+          Curves.easeOut,
+
+          child:
+          ClipRRect(
+            borderRadius:
+            BorderRadius.circular(
+              28.r,
+            ),
+
+            child:
+            SizedBox(
+              width:
+              double.infinity,
+
+              height:
+              widget.height,
+
+              child:
+              AnimatedBuilder(
+                animation:
+                _motionController,
+
+                builder:
+                    (
+                    context,
+                    child,
+                    ) {
+                  final progress =
+                      _motionController
+                          .value;
+
+                  final radians =
+                      progress *
+                          math.pi *
+                          2;
+
+                  final dx =
+                      math.sin(
+                        radians,
+                      ) *
+                          3.5;
+
+                  final dy =
+                      math.cos(
+                        radians *
+                            .7,
+                      ) *
+                          2.0;
+
+                  final scale =
+                      1.035 +
+                          math.sin(
+                            radians *
+                                .8,
+                          ) *
+                              .007;
+
+                  return Stack(
+                    fit:
+                    StackFit.expand,
+
+                    children: [
+                      // ------------------------------------------------
+                      // MOVING IMAGE
+                      // ------------------------------------------------
+
+                      Transform.translate(
+                        offset:
+                        Offset(
+                          dx,
+                          dy,
+                        ),
+
+                        child:
+                        Transform.scale(
+                          scale:
+                          scale,
+
+                          child:
+                          child,
+                        ),
+                      ),
+
+                      // ------------------------------------------------
+                      // IMAGE READABILITY GRADIENT
+                      //
+                      // This is NOT a glow.
+                      // This is only for text readability.
+                      // ------------------------------------------------
+
+                      Positioned.fill(
+                        child:
+                        DecoratedBox(
+                          decoration:
+                          BoxDecoration(
+                            gradient:
+                            LinearGradient(
+                              begin:
+                              Alignment.topCenter,
+
+                              end:
+                              Alignment.bottomCenter,
+
+                              stops: const [
+                                0.38,
+                                0.68,
+                                1.0,
+                              ],
+
+                              colors: [
+                                Colors
+                                    .transparent,
+
+                                Colors.black
+                                    .withOpacity(
+                                  .08,
+                                ),
+
+                                Colors.black
+                                    .withOpacity(
+                                  .72,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // ------------------------------------------------
+                      // API CATEGORY
+                      // ------------------------------------------------
+
+                      Positioned(
+                        left:
+                        18.w,
+
+                        bottom:
+                        52.h,
+
+                        right:
+                        70.w,
+
+                        child:
+                        Text(
+                          widget.category
+                              .toUpperCase(),
+
+                          maxLines:
+                          1,
+
+                          overflow:
+                          TextOverflow
+                              .ellipsis,
+
+                          style:
+                          GoogleFonts
+                              .manrope(
+                            color: Colors
+                                .white
+                                .withOpacity(
+                              .68,
+                            ),
+
+                            fontSize:
+                            7.sp,
+
+                            fontWeight:
+                            FontWeight
+                                .w700,
+
+                            letterSpacing:
+                            1.3,
+                          ),
+                        ),
+                      ),
+
+                      // ------------------------------------------------
+                      // WALLPAPER NAME
+                      // ------------------------------------------------
+
+                      Positioned(
+                        left:
+                        18.w,
+
+                        right:
+                        62.w,
+
+                        bottom:
+                        17.h,
+
+                        child:
+                        Text(
+                          widget.title,
+
+                          maxLines:
+                          2,
+
+                          overflow:
+                          TextOverflow
+                              .ellipsis,
+
+                          style:
+                          GoogleFonts
+                              .manrope(
+                            color:
+                            Colors
+                                .white,
+
+                            fontSize:
+                            16.sp,
+
+                            fontWeight:
+                            FontWeight
+                                .w700,
+
+                            height:
+                            1.04,
+                          ),
+                        ),
+                      ),
+
+                      // ------------------------------------------------
+                      // NUMBER
+                      // ------------------------------------------------
+
+                      Positioned(
+                        top:
+                        14.h,
+
+                        right:
+                        17.w,
+
+                        child:
+                        Text(
+                          '${widget.index + 1}'
+                              .padLeft(
+                            2,
+                            '0',
+                          ),
+
+                          style:
+                          GoogleFonts
+                              .manrope(
+                            color: Colors
+                                .white
+                                .withOpacity(
+                              .60,
+                            ),
+
+                            fontSize:
+                            8.sp,
+
+                            fontWeight:
+                            FontWeight
+                                .w700,
+
+                            letterSpacing:
+                            1.1,
+                          ),
+                        ),
+                      ),
+
+                      // ------------------------------------------------
+                      // OPEN BUTTON
+                      // ------------------------------------------------
+
+                      Positioned(
+                        right:
+                        17.w,
+
+                        bottom:
+                        16.h,
+
+                        child:
+                        AnimatedContainer(
+                          duration:
+                          const Duration(
+                            milliseconds:
+                            150,
+                          ),
+
+                          width:
+                          pressed
+                              ? 38.w
+                              : 42.w,
+
+                          height:
+                          pressed
+                              ? 38.w
+                              : 42.w,
+
+                          decoration:
+                          BoxDecoration(
+                            color: Colors
+                                .white
+                                .withOpacity(
+                              .12,
+                            ),
+
+                            shape:
+                            BoxShape
+                                .circle,
+
+                            border:
+                            Border.all(
+                              color: Colors
+                                  .white
+                                  .withOpacity(
+                                .16,
+                              ),
+
+                              width:
+                              1,
+                            ),
+                          ),
+
+                          child:
+                          Icon(
+                            Icons
+                                .arrow_outward_rounded,
+
+                            color:
+                            Colors.white,
+
+                            size:
+                            15.sp,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+
+                child:
+                Image.network(
+                  widget.image,
+
+                  width:
+                  double.infinity,
+
+                  height:
+                  widget.height,
+
+                  fit:
+                  BoxFit.cover,
+
+                  filterQuality:
+                  FilterQuality.high,
+
+                  cacheWidth:
+                  1100,
+
+                  gaplessPlayback:
+                  true,
+
+                  errorBuilder:
+                      (
+                      context,
+                      error,
+                      stackTrace,
+                      ) {
+                    return Container(
+                      color:
+                      Theme.of(
+                        context,
+                      ).brightness ==
+                          Brightness.dark
+                          ? const Color(
+                        0xFF181919,
+                      )
+                          : const Color(
+                        0xFFE8E8E8,
+                      ),
+
+                      alignment:
+                      Alignment.center,
+
+                      child:
+                      Icon(
+                        Icons
+                            .image_not_supported_outlined,
+
+                        color:
+                        widget.muted,
+
+                        size:
+                        28.sp,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =================================================================
+// LOADING CARD
+// =================================================================
+
+class _LoadingCard
+    extends StatefulWidget {
+  final double height;
+  final bool dark;
+
+  const _LoadingCard({
+    required this.height,
+    required this.dark,
+  });
+
+  @override
+  State<_LoadingCard> createState() =>
+      _LoadingCardState();
+}
+
+class _LoadingCardState
+    extends State<_LoadingCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController
+  _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller =
+        AnimationController(
+          vsync: this,
+
+          duration:
+          const Duration(
+            milliseconds: 1250,
+          ),
+        );
+
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+
+    super.dispose();
+  }
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    final base =
+    widget.dark
+        ? const Color(
+      0xFF181919,
+    )
+        : const Color(
+      0xFFE8E8E8,
+    );
+
+    return ClipRRect(
+      borderRadius:
+      BorderRadius.circular(
+        28.r,
+      ),
+
+      child:
+      SizedBox(
+        height:
+        widget.height,
+
+        child:
+        AnimatedBuilder(
+          animation:
+          _controller,
+
+          builder:
+              (
+              context,
+              child,
+              ) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child:
+                  ColoredBox(
+                    color:
+                    base,
+                  ),
+                ),
+
+                Positioned(
+                  left:
+                  -180.w +
+                      (_controller
+                          .value *
+                          500.w),
+
+                  top:
+                  0,
+
+                  bottom:
+                  0,
+
+                  child:
+                  Container(
+                    width:
+                    170.w,
+
+                    decoration:
+                    BoxDecoration(
+                      gradient:
+                      LinearGradient(
+                        colors: [
+                          base,
+
+                          Colors.white
+                              .withOpacity(
+                            .065,
+                          ),
+
+                          base,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 }

@@ -19,8 +19,10 @@ class DesktopPage extends StatefulWidget {
 class _DesktopPageState extends State<DesktopPage> {
   late Future<List<String>> _desktopFuture;
 
-  bool get _isDark =>
-      Theme.of(context).brightness == Brightness.dark;
+  // Index of the wallpaper currently expanded in the collection.
+  int? _expandedIndex;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   Color get _background =>
       _isDark ? AppColors.darkBackground : AppColors.lightBackground;
@@ -29,9 +31,7 @@ class _DesktopPageState extends State<DesktopPage> {
       _isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
   Color get _surfaceSoft =>
-      _isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
+      _isDark ? AppColors.darkSurfaceSoft : AppColors.lightSurfaceSoft;
 
   Color get _primary =>
       _isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
@@ -39,8 +39,7 @@ class _DesktopPageState extends State<DesktopPage> {
   Color get _secondary =>
       _isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
 
-  Color get _muted =>
-      _isDark ? AppColors.darkMuted : AppColors.lightMuted;
+  Color get _muted => _isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
   Color get _divider =>
       _isDark ? AppColors.darkDivider : AppColors.lightDivider;
@@ -68,11 +67,8 @@ class _DesktopPageState extends State<DesktopPage> {
         .get(Uri.parse(apiUrl))
         .timeout(const Duration(seconds: 15));
 
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300) {
-      throw Exception(
-        'Server returned ${response.statusCode}',
-      );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Server returned ${response.statusCode}');
     }
 
     final decoded = jsonDecode(response.body);
@@ -165,50 +161,47 @@ class _DesktopPageState extends State<DesktopPage> {
                 ),
                 cacheExtent: 1000,
                 slivers: [
-                  SliverToBoxAdapter(
-                    child: _buildHeader(wallpapers.length),
-                  ),
+                  SliverToBoxAdapter(child: _buildHeader(wallpapers.length)),
 
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      14.w,
-                      2.h,
-                      14.w,
-                      70.h,
-                    ),
+                    padding: EdgeInsets.fromLTRB(14.w, 2.h, 14.w, 70.h),
                     sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                          final imageUrl = wallpapers[index];
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final imageUrl = wallpapers[index];
 
-                          return RepaintBoundary(
-                            child: Padding(
-                              padding: EdgeInsets.only(bottom: 12.h),
-                              child: _AnimatedDesktopCard(
-                                key: ValueKey(
-                                  '${imageUrl}_$index',
-                                ),
+                        return RepaintBoundary(
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 12.h),
+                            child: _AnimatedDesktopCard(
+                              key: ValueKey('${imageUrl}_$index'),
+                              index: index,
+                              child: _DesktopCard(
+                                imageUrl: imageUrl,
                                 index: index,
-                                child: _DesktopCard(
-                                  imageUrl: imageUrl,
-                                  index: index,
-                                  primary: _primary,
-                                  muted: _muted,
-                                  divider: _divider,
-                                  surface: _surface,
-                                  surfaceSoft: _surfaceSoft,
-                                  accent: _accent,
-                                  isDark: _isDark,
-                                  onTap: () {
-                                    _openPreview(imageUrl);
-                                  },
-                                ),
+                                primary: _primary,
+                                muted: _muted,
+                                divider: _divider,
+                                surface: _surface,
+                                surfaceSoft: _surfaceSoft,
+                                accent: _accent,
+                                isDark: _isDark,
+                                isExpanded: _expandedIndex == index,
+                                onToggleExtend: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() {
+                                    _expandedIndex = _expandedIndex == index
+                                        ? null
+                                        : index;
+                                  });
+                                },
+                                onTap: () {
+                                  _openPreview(imageUrl);
+                                },
                               ),
                             ),
-                          );
-                        },
-                        childCount: wallpapers.length,
-                      ),
+                          ),
+                        );
+                      }, childCount: wallpapers.length),
                     ),
                   ),
                 ],
@@ -226,12 +219,7 @@ class _DesktopPageState extends State<DesktopPage> {
 
   Widget _buildHeader(int count) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        18.w,
-        13.h,
-        18.w,
-        15.h,
-      ),
+      padding: EdgeInsets.fromLTRB(18.w, 13.h, 18.w, 15.h),
       child: Column(
         children: [
           Row(
@@ -347,22 +335,10 @@ class _DesktopPageState extends State<DesktopPage> {
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 400),
         reverseTransitionDuration: const Duration(milliseconds: 280),
-        pageBuilder: (
-            context,
-            animation,
-            secondaryAnimation,
-            ) {
-          return PreviewScreen(
-            imageUrl: imageUrl,
-            category: 'Desktop 4K',
-          );
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return PreviewScreen(imageUrl: imageUrl, category: 'Desktop 4K');
         },
-        transitionsBuilder: (
-            context,
-            animation,
-            secondaryAnimation,
-            child,
-            ) {
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final curved = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
@@ -372,10 +348,7 @@ class _DesktopPageState extends State<DesktopPage> {
           return FadeTransition(
             opacity: curved,
             child: ScaleTransition(
-              scale: Tween<double>(
-                begin: .975,
-                end: 1,
-              ).animate(curved),
+              scale: Tween<double>(begin: .975, end: 1).animate(curved),
               child: child,
             ),
           );
@@ -394,16 +367,13 @@ class _DesktopPageState extends State<DesktopPage> {
       backgroundColor: Colors.transparent,
       isScrollControlled: false,
       builder: (context) {
-        final isDark =
-            Theme.of(context).brightness == Brightness.dark;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         final sheetSurface = isDark
             ? AppColors.darkSurface
             : AppColors.lightSurface;
 
-        final primary = isDark
-            ? AppColors.darkPrimary
-            : AppColors.lightPrimary;
+        final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
 
         final secondary = isDark
             ? AppColors.darkSecondary
@@ -411,12 +381,7 @@ class _DesktopPageState extends State<DesktopPage> {
 
         return SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              12.w,
-              0,
-              12.w,
-              12.h,
-            ),
+            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
             child: Container(
               padding: EdgeInsets.all(17.w),
               decoration: BoxDecoration(
@@ -446,8 +411,7 @@ class _DesktopPageState extends State<DesktopPage> {
                   SizedBox(width: 12.w),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'DESKTOP 4K',
@@ -512,11 +476,7 @@ class _DesktopPageState extends State<DesktopPage> {
                 borderRadius: BorderRadius.circular(29.r),
                 border: Border.all(color: _divider),
               ),
-              child: Icon(
-                Icons.cloud_off_rounded,
-                color: _accent,
-                size: 29.sp,
-              ),
+              child: Icon(Icons.cloud_off_rounded, color: _accent, size: 29.sp),
             ),
             SizedBox(height: 19.h),
             Text(
@@ -620,12 +580,10 @@ class _AnimatedDesktopCard extends StatefulWidget {
   });
 
   @override
-  State<_AnimatedDesktopCard> createState() =>
-      _AnimatedDesktopCardState();
+  State<_AnimatedDesktopCard> createState() => _AnimatedDesktopCardState();
 }
 
-class _AnimatedDesktopCardState
-    extends State<_AnimatedDesktopCard>
+class _AnimatedDesktopCardState extends State<_AnimatedDesktopCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
@@ -645,19 +603,14 @@ class _AnimatedDesktopCardState
       curve: Curves.easeOutCubic,
     );
 
-    _fade = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(curve);
+    _fade = Tween<double>(begin: 0, end: 1).animate(curve);
 
     _slide = Tween<Offset>(
       begin: const Offset(0, .045),
       end: Offset.zero,
     ).animate(curve);
 
-    final delay = Duration(
-      milliseconds: (widget.index.clamp(0, 7)) * 45,
-    );
+    final delay = Duration(milliseconds: (widget.index.clamp(0, 7)) * 45);
 
     Future.delayed(delay, () {
       if (mounted) {
@@ -676,10 +629,7 @@ class _AnimatedDesktopCardState
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fade,
-      child: SlideTransition(
-        position: _slide,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _slide, child: widget.child),
     );
   }
 }
@@ -700,6 +650,8 @@ class _DesktopCard extends StatefulWidget {
   final Color accent;
 
   final bool isDark;
+  final bool isExpanded;
+  final VoidCallback onToggleExtend;
   final VoidCallback onTap;
 
   const _DesktopCard({
@@ -712,6 +664,8 @@ class _DesktopCard extends StatefulWidget {
     required this.surfaceSoft,
     required this.accent,
     required this.isDark,
+    required this.isExpanded,
+    required this.onToggleExtend,
     required this.onTap,
   });
 
@@ -768,8 +722,10 @@ class _DesktopCardState extends State<_DesktopCard>
         scale: _pressed ? .975 : 1,
         duration: const Duration(milliseconds: 130),
         curve: Curves.easeOutCubic,
-        child: Container(
-          height: 206.h,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 520),
+          curve: Curves.easeInOutCubic,
+          height: widget.isExpanded ? 490.h : 206.h,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: widget.surface,
@@ -792,12 +748,7 @@ class _DesktopCardState extends State<_DesktopCard>
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: const [
-                        0,
-                        .48,
-                        .78,
-                        1,
-                      ],
+                      stops: const [0, .48, .78, 1],
                       colors: [
                         Colors.black.withOpacity(.04),
                         Colors.transparent,
@@ -820,6 +771,16 @@ class _DesktopCardState extends State<_DesktopCard>
                   border: Colors.white.withOpacity(.28),
                 ),
               ),
+              // Extend action — top-right of every wallpaper.
+              Positioned(
+                right: 14.w,
+                top: 13.h,
+                child: _ExtendButton(
+                  expanded: widget.isExpanded,
+                  onTap: widget.onToggleExtend,
+                ),
+              ),
+
               // Large wallpaper title.
               Positioned(
                 left: 18.w,
@@ -830,8 +791,7 @@ class _DesktopCardState extends State<_DesktopCard>
                   children: [
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             _getName(widget.imageUrl),
@@ -881,17 +841,12 @@ class _DesktopCardState extends State<_DesktopCard>
     return AnimatedBuilder(
       animation: _imageController,
       builder: (context, child) {
-        final value = Curves.easeInOut.transform(
-          _imageController.value,
-        );
+        final value = Curves.easeInOut.transform(_imageController.value);
 
         return Transform.scale(
           scale: 1.025 + (value * .018),
           child: Transform.translate(
-            offset: Offset(
-              0,
-              -1.5 + (value * 3),
-            ),
+            offset: Offset(0, -1.5 + (value * 3)),
             child: child,
           ),
         );
@@ -901,11 +856,7 @@ class _DesktopCardState extends State<_DesktopCard>
         fit: BoxFit.cover,
         filterQuality: FilterQuality.medium,
         cacheWidth: 1200,
-        errorBuilder: (
-            context,
-            error,
-            stackTrace,
-            ) {
+        errorBuilder: (context, error, stackTrace) {
           return Container(
             color: widget.surfaceSoft,
             alignment: Alignment.center,
@@ -916,11 +867,7 @@ class _DesktopCardState extends State<_DesktopCard>
             ),
           );
         },
-        loadingBuilder: (
-            context,
-            child,
-            loadingProgress,
-            ) {
+        loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) {
             return child;
           }
@@ -934,10 +881,9 @@ class _DesktopCardState extends State<_DesktopCard>
               child: CircularProgressIndicator(
                 strokeWidth: 1.4,
                 color: widget.accent,
-                value:
-                loadingProgress.expectedTotalBytes != null
+                value: loadingProgress.expectedTotalBytes != null
                     ? loadingProgress.cumulativeBytesLoaded /
-                    loadingProgress.expectedTotalBytes!
+                          loadingProgress.expectedTotalBytes!
                     : null,
               ),
             ),
@@ -952,29 +898,17 @@ class _DesktopCardState extends State<_DesktopCard>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final isDark =
-            Theme.of(context).brightness == Brightness.dark;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        final surface = isDark
-            ? AppColors.darkSurface
-            : AppColors.lightSurface;
+        final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
-        final primary = isDark
-            ? AppColors.darkPrimary
-            : AppColors.lightPrimary;
+        final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
 
-        final divider = isDark
-            ? AppColors.darkDivider
-            : AppColors.lightDivider;
+        final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
         return SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              12.w,
-              0,
-              12.w,
-              12.h,
-            ),
+            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
             child: Container(
               padding: EdgeInsets.all(10.w),
               decoration: BoxDecoration(
@@ -1000,24 +934,16 @@ class _DesktopCardState extends State<_DesktopCard>
       value = value.split('?').first;
 
       value = value.replaceFirst(
-        RegExp(
-          r'\.(jpg|jpeg|png|webp|avif)$',
-          caseSensitive: false,
-        ),
+        RegExp(r'\.(jpg|jpeg|png|webp|avif)$', caseSensitive: false),
         '',
       );
 
       value = value.replaceFirst(
-        RegExp(
-          r'[_-]?\d{3,5}x\d{3,5}$',
-          caseSensitive: false,
-        ),
+        RegExp(r'[_-]?\d{3,5}x\d{3,5}$', caseSensitive: false),
         '',
       );
 
-      value = value
-          .replaceAll(RegExp(r'[_-]+'), ' ')
-          .trim();
+      value = value.replaceAll(RegExp(r'[_-]+'), ' ').trim();
 
       if (value.isEmpty) {
         return 'DESKTOP';
@@ -1027,13 +953,13 @@ class _DesktopCardState extends State<_DesktopCard>
           .split(' ')
           .where((word) => word.trim().isNotEmpty)
           .map((word) {
-        if (word.length == 1) {
-          return word.toUpperCase();
-        }
+            if (word.length == 1) {
+              return word.toUpperCase();
+            }
 
-        return '${word[0].toUpperCase()}'
-            '${word.substring(1).toLowerCase()}';
-      })
+            return '${word[0].toUpperCase()}'
+                '${word.substring(1).toLowerCase()}';
+          })
           .join(' ');
     } catch (_) {
       return 'DESKTOP';
@@ -1118,34 +1044,22 @@ class _FilterPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: EdgeInsets.symmetric(
-        horizontal: 12.w,
-        vertical: 7.h,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
       decoration: BoxDecoration(
-        color: selected
-            ? primary
-            : surface,
+        color: selected ? primary : surface,
         borderRadius: BorderRadius.circular(100.r),
-        border: Border.all(
-          color: selected
-              ? primary
-              : divider,
-        ),
+        border: Border.all(color: selected ? primary : divider),
       ),
       child: Text(
         label,
         style: GoogleFonts.manrope(
           color: selected
-              ? (isDark
-              ? AppColors.darkBackground
-              : AppColors.lightBackground)
+              ? (isDark ? AppColors.darkBackground : AppColors.lightBackground)
               : primary,
           fontSize: 5.5.sp,
           fontWeight: FontWeight.w800,
@@ -1214,15 +1128,9 @@ class _TopButtonState extends State<_TopButton> {
           decoration: BoxDecoration(
             color: widget.background,
             borderRadius: BorderRadius.circular(19.r),
-            border: Border.all(
-              color: widget.border,
-            ),
+            border: Border.all(color: widget.border),
           ),
-          child: Icon(
-            widget.icon,
-            size: 18.sp,
-            color: widget.foreground,
-          ),
+          child: Icon(widget.icon, size: 18.sp, color: widget.foreground),
         ),
       ),
     );
@@ -1249,16 +1157,11 @@ class _GlassPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 10.w,
-        vertical: 7.h,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(100.r),
-        border: Border.all(
-          color: border,
-        ),
+        border: Border.all(color: border),
       ),
       child: Text(
         text,
@@ -1268,6 +1171,78 @@ class _GlassPill extends StatelessWidget {
           fontWeight: FontWeight.w800,
           letterSpacing: .45,
           height: 1,
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// EXTEND BUTTON
+// =============================================================================
+
+class _ExtendButton extends StatefulWidget {
+  final bool expanded;
+  final VoidCallback onTap;
+
+  const _ExtendButton({required this.expanded, required this.onTap});
+
+  @override
+  State<_ExtendButton> createState() => _ExtendButtonState();
+}
+
+class _ExtendButtonState extends State<_ExtendButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      child: AnimatedScale(
+        scale: _pressed ? .92 : 1,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(widget.expanded ? .46 : .20),
+            borderRadius: BorderRadius.circular(100.r),
+            border: Border.all(color: Colors.white.withOpacity(.28)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedRotation(
+                turns: widget.expanded ? .5 : 0,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  Icons.unfold_more_rounded,
+                  color: Colors.white,
+                  size: 16.sp,
+                ),
+              ),
+              SizedBox(width: 5.w),
+              Text(
+                widget.expanded ? 'COLLAPSE' : 'EXTEND',
+                style: GoogleFonts.manrope(
+                  color: Colors.white,
+                  fontSize: 5.3.sp,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .65,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1294,12 +1269,10 @@ class _CircleIconButton extends StatefulWidget {
   });
 
   @override
-  State<_CircleIconButton> createState() =>
-      _CircleIconButtonState();
+  State<_CircleIconButton> createState() => _CircleIconButtonState();
 }
 
-class _CircleIconButtonState
-    extends State<_CircleIconButton> {
+class _CircleIconButtonState extends State<_CircleIconButton> {
   bool _pressed = false;
 
   @override
@@ -1333,15 +1306,9 @@ class _CircleIconButtonState
           decoration: BoxDecoration(
             color: widget.background,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: widget.border,
-            ),
+            border: Border.all(color: widget.border),
           ),
-          child: Icon(
-            widget.icon,
-            color: widget.foreground,
-            size: 17.sp,
-          ),
+          child: Icon(widget.icon, color: widget.foreground, size: 17.sp),
         ),
       ),
     );
@@ -1399,16 +1366,11 @@ class _ActionButtonState extends State<_ActionButton> {
         scale: _pressed ? .96 : 1,
         duration: const Duration(milliseconds: 120),
         child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 20.w,
-            vertical: 12.h,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
           decoration: BoxDecoration(
             color: widget.surface,
             borderRadius: BorderRadius.circular(17.r),
-            border: Border.all(
-              color: widget.divider,
-            ),
+            border: Border.all(color: widget.divider),
           ),
           child: Text(
             widget.label,
@@ -1445,8 +1407,7 @@ class _LoadingCard extends StatefulWidget {
   State<_LoadingCard> createState() => _LoadingCardState();
 }
 
-class _LoadingCardState
-    extends State<_LoadingCard>
+class _LoadingCardState extends State<_LoadingCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
@@ -1471,8 +1432,7 @@ class _LoadingCardState
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final opacity =
-            .45 + (_controller.value * .4);
+        final opacity = .45 + (_controller.value * .4);
 
         return AnimatedOpacity(
           opacity: opacity,
@@ -1486,9 +1446,7 @@ class _LoadingCardState
         decoration: BoxDecoration(
           color: widget.surface,
           borderRadius: BorderRadius.circular(27.r),
-          border: Border.all(
-            color: widget.divider,
-          ),
+          border: Border.all(color: widget.divider),
         ),
         child: Center(
           child: SizedBox(
@@ -1523,12 +1481,10 @@ class _BottomSheetAction extends StatefulWidget {
   });
 
   @override
-  State<_BottomSheetAction> createState() =>
-      _BottomSheetActionState();
+  State<_BottomSheetAction> createState() => _BottomSheetActionState();
 }
 
-class _BottomSheetActionState
-    extends State<_BottomSheetAction> {
+class _BottomSheetActionState extends State<_BottomSheetAction> {
   bool _pressed = false;
 
   @override
@@ -1555,23 +1511,14 @@ class _BottomSheetActionState
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOutCubic,
         margin: EdgeInsets.only(bottom: 5.h),
-        padding: EdgeInsets.symmetric(
-          horizontal: 12.w,
-          vertical: 12.h,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
         decoration: BoxDecoration(
-          color: _pressed
-              ? widget.color.withOpacity(.06)
-              : Colors.transparent,
+          color: _pressed ? widget.color.withOpacity(.06) : Colors.transparent,
           borderRadius: BorderRadius.circular(17.r),
         ),
         child: Row(
           children: [
-            Icon(
-              widget.icon,
-              color: widget.color,
-              size: 18.sp,
-            ),
+            Icon(widget.icon, color: widget.color, size: 18.sp),
             SizedBox(width: 12.w),
             Text(
               widget.label,

@@ -16,14 +16,14 @@ import 'about_Screen.dart';
 
 /// FRAMES — Preferences
 ///
-/// Bento / boxy editorial UI inspired by the supplied reference:
-/// - 2-column asymmetric grid
-/// - large rounded rectangular cards
-/// - soft translucent-looking surfaces
-/// - compact category pills
-/// - oversized typography
-/// - minimal metadata
-/// - subtle press animations
+/// Material 3 Expressive settings experience:
+/// - large editorial hero
+/// - tonal Material 3 cards
+/// - expressive segmented theme control
+/// - animated section entrance
+/// - springy press feedback
+/// - accessible touch targets
+/// - dark/light/system support
 class PreferencesScreen extends StatefulWidget {
   const PreferencesScreen({super.key});
 
@@ -31,22 +31,23 @@ class PreferencesScreen extends StatefulWidget {
     return Navigator.push<T>(
       context,
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 280),
-        reverseTransitionDuration: const Duration(milliseconds: 220),
+        transitionDuration: const Duration(milliseconds: 420),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
         pageBuilder: (_, __, ___) => const PreferencesScreen(),
         transitionsBuilder: (_, animation, __, child) {
-          final curve = CurvedAnimation(
+          final curved = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
           );
 
           return FadeTransition(
-            opacity: curve,
+            opacity: curved,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0, .025),
+                begin: const Offset(0, .035),
                 end: Offset.zero,
-              ).animate(curve),
+              ).animate(curved),
               child: child,
             ),
           );
@@ -59,11 +60,12 @@ class PreferencesScreen extends StatefulWidget {
   State<PreferencesScreen> createState() => _PreferencesScreenState();
 }
 
-class _PreferencesScreenState extends State<PreferencesScreen> {
+class _PreferencesScreenState extends State<PreferencesScreen>
+    with SingleTickerProviderStateMixin {
   bool _clearingCache = false;
+  late final AnimationController _entranceController;
 
-  bool get _isDark =>
-      Theme.of(context).brightness == Brightness.dark;
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   Color get _background =>
       _isDark ? AppColors.darkBackground : AppColors.lightBackground;
@@ -72,9 +74,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       _isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
   Color get _surfaceSoft =>
-      _isDark
-          ? AppColors.darkSurfaceSoft
-          : AppColors.lightSurfaceSoft;
+      _isDark ? AppColors.darkSurfaceSoft : AppColors.lightSurfaceSoft;
 
   Color get _primary =>
       _isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
@@ -90,63 +90,13 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
 
   Color get _accent => AppColors.accent;
 
-  TextStyle _heroText({
-    required Color color,
-    double size = 50,
-  }) {
-    return GoogleFonts.bebasNeue(
-      color: color,
-      fontSize: size.sp,
-      fontWeight: FontWeight.w400,
-      height: .80,
-      letterSpacing: .55,
-    );
-  }
-
-  TextStyle _titleText({
-    required Color color,
-    double size = 20,
-  }) {
-    return GoogleFonts.bebasNeue(
-      color: color,
-      fontSize: size.sp,
-      fontWeight: FontWeight.w400,
-      height: .88,
-      letterSpacing: .45,
-    );
-  }
-
-  TextStyle _label({
-    required Color color,
-    double size = 6.5,
-    double spacing = 1,
-  }) {
-    return GoogleFonts.manrope(
-      color: color,
-      fontSize: size.sp,
-      fontWeight: FontWeight.w800,
-      height: 1,
-      letterSpacing: spacing,
-    );
-  }
-
-  TextStyle _body({
-    required Color color,
-    double size = 8,
-    FontWeight weight = FontWeight.w500,
-  }) {
-    return GoogleFonts.manrope(
-      color: color,
-      fontSize: size.sp,
-      fontWeight: weight,
-      height: 1.35,
-      letterSpacing: .02,
-    );
-  }
-
   @override
   void initState() {
     super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _updateSystemUI();
@@ -156,15 +106,19 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _updateSystemUI();
     });
   }
 
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
   void _updateSystemUI() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -177,345 +131,481 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     );
   }
 
+  TextStyle _display(Color color, {double size = 52}) {
+    return GoogleFonts.bebasNeue(
+      color: color,
+      fontSize: size.sp,
+      fontWeight: FontWeight.w400,
+      height: .82,
+      letterSpacing: .45,
+    );
+  }
+
+  TextStyle _headline(Color color, {double size = 24}) {
+    return GoogleFonts.bebasNeue(
+      color: color,
+      fontSize: size.sp,
+      fontWeight: FontWeight.w400,
+      height: .88,
+      letterSpacing: .35,
+    );
+  }
+
+  TextStyle _label(Color color, {double size = 10, double spacing = .7}) {
+    return GoogleFonts.manrope(
+      color: color,
+      fontSize: size.sp,
+      fontWeight: FontWeight.w800,
+      height: 1,
+      letterSpacing: spacing,
+    );
+  }
+
+  TextStyle _body(Color color, {double size = 13}) {
+    return GoogleFonts.manrope(
+      color: color,
+      fontSize: size.sp,
+      fontWeight: FontWeight.w500,
+      height: 1.4,
+    );
+  }
+
+  ThemeData _materialTheme(BuildContext context) {
+    final base = Theme.of(context);
+    final scheme = base.colorScheme.copyWith(
+      primary: _accent,
+      onPrimary: Colors.white,
+      surface: _surface,
+      onSurface: _primary,
+      outline: _divider,
+    );
+
+    return base.copyWith(
+      useMaterial3: true,
+      colorScheme: scheme,
+      splashFactory: InkSparkle.splashFactory,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ThemeProvider>();
 
-    return Scaffold(
-      backgroundColor: _background,
-      body: SafeArea(
-        top: true,
-        bottom: true,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
-            SliverToBoxAdapter(child: _buildHero()),
-            SliverToBoxAdapter(child: _buildFilters()),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                child: _buildBentoGrid(provider),
-              ),
+    return Theme(
+      data: _materialTheme(context),
+      child: Scaffold(
+        backgroundColor: _background,
+        body: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-            SliverToBoxAdapter(child: _buildFooter()),
+            slivers: [
+              SliverToBoxAdapter(child: _buildTopBar()),
+              SliverToBoxAdapter(child: _buildHero()),
+              SliverToBoxAdapter(child: _buildAppearanceCard(provider)),
+              SliverToBoxAdapter(child: _buildActions()),
+              SliverToBoxAdapter(child: _buildLegal()),
+              SliverToBoxAdapter(child: _buildCredits()),
+              SliverToBoxAdapter(child: _buildFooter()),
+              // Extra breathing room because this screen can live behind a
+              // persistent/floating bottom navigation bar.
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).viewPadding.bottom + 104.h,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _animated({
+    required int index,
+    required Widget child,
+  }) {
+    final start = (index * .10).clamp(0.0, .65);
+    final end = (start + .42).clamp(0.0, 1.0);
+
+    return AnimatedBuilder(
+      animation: _entranceController,
+      child: child,
+      builder: (context, child) {
+        final t = Curves.easeOutCubic.transform(
+          Interval(start, end).transform(_entranceController.value),
+        );
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, 24.h * (1 - t)),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
+      child: Row(
+        children: [
+          _ExpressiveIconButton(
+            icon: Hicons.left2LightOutline,
+            tooltip: 'Back',
+            onTap: () {
+              HapticFeedback.selectionClick();
+              if (Navigator.canPop(context)) Navigator.pop(context);
+            },
+          ),
+          SizedBox(width: 12.w),
+          Text(
+            'SETTINGS',
+            style: _label(_secondary, size: 10, spacing: 1.15),
+          ),
+          const Spacer(),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: _surfaceSoft,
+              borderRadius: BorderRadius.circular(100.r),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6.w,
+                  height: 6.w,
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: 7.w),
+                Text(
+                  'FRAMES',
+                  style: _label(_muted.withOpacity(.75), size: 8, spacing: .75),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHero() {
+    return _animated(
+      index: 0,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 42.h, 20.w, 24.h),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MAKE IT\nYOURS.',
+              style: _display(_primary, size: 58),
+            ),
+            SizedBox(height: 16.h),
+            Row(
+              children: [
+                Container(
+                  width: 34.w,
+                  height: 3.h,
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    borderRadius: BorderRadius.circular(100.r),
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Text(
+                    'PERSONALIZE THE WAY FRAMES FEELS.',
+                    style: _label(_muted.withOpacity(.72), size: 8, spacing: .9),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ===========================================================================
-  // HEADER
-  // ===========================================================================
+  Widget _buildAppearanceCard(ThemeProvider provider) {
+    final mode = provider.themeMode;
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
-      child: Row(
-        children: [
-          _RoundButton(
-            icon: Hicons.left2LightOutline,
-            onTap: () {
-              HapticFeedback.selectionClick();
-
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            },
-          ),
-          SizedBox(width: 9.w),
-          Expanded(
-            child: Text(
-              'FRAMES',
-              style: _label(
-                color: _secondary,
-                size: 6.2,
-                spacing: 1.15,
+    return _animated(
+      index: 1,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _showAppearanceSheet(provider),
+            borderRadius: BorderRadius.circular(28.r),
+            child: Padding(
+              padding: EdgeInsets.all(18.w),
+              child: Row(
+                children: [
+                  _IconBadge(
+                    icon: _modeIcon(mode),
+                    background: _accent.withOpacity(_isDark ? .18 : .10),
+                    foreground: _accent,
+                    size: 50,
+                  ),
+                  SizedBox(width: 14.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('APPEARANCE', style: _headline(_primary, size: 25)),
+                        SizedBox(height: 5.h),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: Text(
+                            '${_modeName(mode)}  •  ${_modeDescription(mode)}',
+                            key: ValueKey(mode),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: _body(_muted, size: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Container(
+                    width: 40.w,
+                    height: 40.w,
+                    decoration: BoxDecoration(
+                      color: _surfaceSoft,
+                      borderRadius: BorderRadius.circular(14.r),
+                    ),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      color: _secondary,
+                      size: 19.sp,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // ===========================================================================
-  // HERO
-  // ===========================================================================
-
-  Widget _buildHero() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 34.h, 18.w, 18.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'BEHIND THE \nFRAME',
-            style: _heroText(
-              color: _primary,
-              size: 48,
-            ),
-          ),
-          SizedBox(height: 12.h),
-          Row(
-            children: [
-              Container(
-                width: 26.w,
-                height: 2.h,
-                decoration: BoxDecoration(
-                  color: _accent,
-                  borderRadius: BorderRadius.circular(20.r),
-                ),
-              ),
-              SizedBox(width: 8.w),
-              Text(
-                'MAKE FRAMES FEEL LIKE YOURS.',
-                style: _label(
-                  color: _muted.withOpacity(.72),
-                  size: 5.7,
-                  spacing: .85,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  String _modeName(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+        return 'System';
+    }
   }
 
-  // ===========================================================================
-  // FILTER PILLS
-  // ===========================================================================
-
-  Widget _buildFilters() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 0, 18.w, 14.h),
-      child: Row(
-        children: [
-          _FilterPill(
-            label: 'APPEARANCE',
-            selected: true,
-            accent: _accent,
-            primary: _primary,
-            surface: _surface,
-            divider: _divider,
-          ),
-          SizedBox(width: 7.w),
-          _FilterPill(
-            label: 'LIBRARY',
-            selected: false,
-            accent: _accent,
-            primary: _primary,
-            surface: _surface,
-            divider: _divider,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // BENTO GRID
-  // ===========================================================================
-
-  Widget _buildBentoGrid(ThemeProvider provider) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final gap = 8.w;
-        final columnWidth = (constraints.maxWidth - gap) / 2;
-
-        return Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: columnWidth,
-                  child: _buildThemeBentoCard(provider),
-                ),
-                SizedBox(width: gap),
-                SizedBox(
-                  width: columnWidth,
-                  child: Column(
-                    children: [
-                      _BentoActionCard(
-                        height: 118.h,
-                        icon: Hicons.minusLightOutline,
-                        eyebrow: 'LOCAL',
-                        title: 'CLEAR',
-                        subtitle: 'CACHE',
-                        loading: _clearingCache,
-                        onTap:
-                        _clearingCache ? null : _clearCache,
-                        isDark: _isDark,
-                      ),
-                      SizedBox(height: gap),
-                      _BentoActionCard(
-                        height: 118.h,
-                        icon: Hicons.informationSquareLightOutline,
-                        eyebrow: 'FRAMES',
-                        title: 'ABOUT',
-                        subtitle: 'APP',
-                        onTap: () {
-                          _openPage(const AboutAppScreen());
-                        },
-                        isDark: _isDark,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: gap),
-            Row(
-              children: [
-                Expanded(
-                  child: _BentoActionCard(
-                    height: 112.h,
-                    icon: Hicons.shield1LightOutline,
-                    eyebrow: 'LEGAL',
-                    title: 'PRIVACY',
-                    subtitle: 'POLICY',
-                    onTap: () {
-                      _openPage(const PrivacyPolicyScreen());
-                    },
-                    isDark: _isDark,
-                  ),
-                ),
-                SizedBox(width: gap),
-                Expanded(
-                  child: _BentoActionCard(
-                    height: 112.h,
-                    icon: Hicons.documentAlignCenter1LightOutline,
-                    eyebrow: 'LEGAL',
-                    title: 'TERMS',
-                    subtitle: 'USE',
-                    onTap: () {
-                      _openPage(const TermsConditionsScreen());
-                    },
-                    isDark: _isDark,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: gap),
-            _CreditsBentoCard(
-              onTap: () {
-                _openPage(const _CreditsScreen());
-              },
-              isDark: _isDark,
-            ),
-          ],
+  Future<void> _showAppearanceSheet(ThemeProvider provider) async {
+    HapticFeedback.selectionClick();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(.42),
+      builder: (sheetContext) {
+        return _AppearanceSheet(
+          provider: provider,
+          isDark: _isDark,
+          background: _background,
+          surface: _surface,
+          surfaceSoft: _surfaceSoft,
+          primary: _primary,
+          secondary: _secondary,
+          muted: _muted,
+          divider: _divider,
+          accent: _accent,
         );
       },
     );
   }
 
-  Widget _buildThemeBentoCard(ThemeProvider provider) {
-    final mode = provider.themeMode;
-
-    return Container(
-      height: 244.h,
-      padding: EdgeInsets.all(12.w),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(28.r),
-        border: Border.all(color: _divider),
+  Widget _buildActions() {
+    return _animated(
+      index: 2,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('QUICK ACTIONS', '02'),
+            SizedBox(height: 9.h),
+            Row(
+              children: [
+                Expanded(
+                  child: _ExpressiveActionCard(
+                    icon: Hicons.minusLightOutline,
+                    eyebrow: 'LOCAL',
+                    title: 'CLEAR',
+                    subtitle: 'CACHE',
+                    loading: _clearingCache,
+                    onTap: _clearingCache ? null : _clearCache,
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: _ExpressiveActionCard(
+                    icon: Hicons.informationSquareLightOutline,
+                    eyebrow: 'FRAMES',
+                    title: 'ABOUT',
+                    subtitle: 'APP',
+                    onTap: () => _openPage(const AboutAppScreen()),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildLegal() {
+    return _animated(
+      index: 3,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16.w, 26.h, 16.w, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('LEGAL & PRIVACY', '02'),
+            SizedBox(height: 9.h),
+            Card(
+              child: Column(
+                children: [
+                  _SettingsTile(
+                    icon: Hicons.shield1LightOutline,
+                    title: 'Privacy Policy',
+                    subtitle: 'How your information is handled.',
+                    onTap: () => _openPage(const PrivacyPolicyScreen()),
+                  ),
+                  Divider(height: 1, indent: 68.w, endIndent: 16.w, color: _divider),
+                  _SettingsTile(
+                    icon: Hicons.documentAlignCenter1LightOutline,
+                    title: 'Terms of Use',
+                    subtitle: 'Rules and conditions for using Frames.',
+                    onTap: () => _openPage(const TermsConditionsScreen()),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCredits() {
+    return _animated(
+      index: 4,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16.w, 26.h, 16.w, 0),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28.r),
+            onTap: () => _openPage(const _CreditsScreen()),
+            child: Padding(
+              padding: EdgeInsets.all(18.w),
+              child: Row(
+                children: [
+                  _IconBadge(
+                    icon: Icons.auto_awesome_rounded,
+                    background: _accent,
+                    foreground: Colors.white,
+                    size: 48,
+                  ),
+                  SizedBox(width: 13.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('CREDITS', style: _headline(_primary, size: 25)),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Creators, artists & sources behind the collection.',
+                          style: _body(_muted, size: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      size: 16.sp, color: _muted.withOpacity(.55)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20.w, 30.h, 20.w, 24.h),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(height: 1, color: _divider),
+          SizedBox(height: 13.h),
           Row(
             children: [
+              Text(
+                'FRAMES',
+                style: _label(_muted.withOpacity(.48), size: 8, spacing: 1),
+              ),
+              SizedBox(width: 8.w),
               Container(
-                width: 38.w,
-                height: 38.w,
+                width: 4.w,
+                height: 4.w,
                 decoration: BoxDecoration(
-                  color: _surfaceSoft,
+                  color: _accent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  _modeIcon(mode),
-                  color: _primary,
-                  size: 17.sp,
-                ),
               ),
-              const Spacer(),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 7.w,
-                  vertical: 5.h,
-                ),
-                decoration: BoxDecoration(
-                  color: _surfaceSoft,
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                child: Text(
-                  '01',
-                  style: _label(
-                    color: _muted.withOpacity(.6),
-                    size: 5.2,
-                    spacing: .7,
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  child: Text(
+                    AppInfo.buildCodename,
+                    overflow: TextOverflow.ellipsis,
+                    style: _label(_muted.withOpacity(.36), size: 8, spacing: .65),
                   ),
                 ),
               ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            'THEME',
-            style: _titleText(
-              color: _primary,
-              size: 23,
-            ),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            _modeDescription(mode),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: _body(
-              color: _muted,
-              size: 7,
-            ),
-          ),
-          SizedBox(height: 11.h),
-          Row(
-            children: [
-              _MiniThemeButton(
-                icon: Icons.light_mode_rounded,
-                selected: mode == ThemeMode.light,
-                isDark: _isDark,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  provider.toggleTheme(false);
-                },
-              ),
-              SizedBox(width: 5.w),
-              _MiniThemeButton(
-                icon: Icons.dark_mode_rounded,
-                selected: mode == ThemeMode.dark,
-                isDark: _isDark,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  provider.toggleTheme(true);
-                },
-              ),
-              SizedBox(width: 5.w),
-              _MiniThemeButton(
-                icon: Icons.brightness_auto_rounded,
-                selected: mode == ThemeMode.system,
-                isDark: _isDark,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  _showSystemMessage();
-                },
+              Text(
+                'v${AppInfo.buildNumber}',
+                style: _label(_muted.withOpacity(.36), size: 8, spacing: .65),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _sectionTitle(String title, String count) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(title, style: _headline(_primary, size: 22)),
+        const Spacer(),
+        Text(count, style: _label(_muted.withOpacity(.48), size: 8, spacing: .8)),
+      ],
     );
   }
 
@@ -533,56 +623,34 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   String _modeDescription(ThemeMode mode) {
     switch (mode) {
       case ThemeMode.light:
-        return 'Bright and clean. A softer frame for daytime.';
+        return 'Bright, calm and optimized for daytime.';
       case ThemeMode.dark:
-        return 'Deep and immersive. Designed for low light.';
+        return 'Deep, immersive and comfortable at night.';
       case ThemeMode.system:
-        return 'Automatically follows your device appearance.';
+        return 'Follows your device appearance automatically.';
     }
   }
-
-  void _showSystemMessage() {
-    _showSnackBar('AUTO FOLLOWS YOUR DEVICE');
-  }
-
-  // ===========================================================================
-  // CACHE
-  // ===========================================================================
 
   Future<void> _clearCache() async {
     if (_clearingCache) return;
 
     HapticFeedback.mediumImpact();
-
-    setState(() {
-      _clearingCache = true;
-    });
+    setState(() => _clearingCache = true);
 
     try {
       await DefaultCacheManager().emptyCache();
-
       if (!mounted) return;
-
       HapticFeedback.selectionClick();
       _showSnackBar('CACHE CLEARED');
     } catch (error) {
       debugPrint('Cache error: $error');
-
       if (!mounted) return;
-
       _showSnackBar('COULD NOT CLEAR CACHE');
     } finally {
       if (!mounted) return;
-
-      setState(() {
-        _clearingCache = false;
-      });
+      setState(() => _clearingCache = false);
     }
   }
-
-  // ===========================================================================
-  // NAVIGATION
-  // ===========================================================================
 
   void _openPage(Widget page) {
     HapticFeedback.selectionClick();
@@ -590,23 +658,18 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     Navigator.push(
       context,
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 240),
-        reverseTransitionDuration:
-        const Duration(milliseconds: 190),
+        transitionDuration: const Duration(milliseconds: 360),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
         pageBuilder: (_, __, ___) => page,
         transitionsBuilder: (_, animation, __, child) {
           final curve = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
           );
-
           return FadeTransition(
             opacity: curve,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, .018),
-                end: Offset.zero,
-              ).animate(curve),
+            child: ScaleTransition(
+              scale: Tween<double>(begin: .975, end: 1).animate(curve),
               child: child,
             ),
           );
@@ -615,27 +678,17 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     );
   }
 
-  // ===========================================================================
-  // SNACKBAR
-  // ===========================================================================
-
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: _surface,
+          margin: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+          backgroundColor: _primary,
           elevation: 0,
-          margin: EdgeInsets.fromLTRB(
-            14.w,
-            0,
-            14.w,
-            14.h,
-          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18.r),
-            side: BorderSide(color: _divider),
           ),
           content: Row(
             children: [
@@ -651,11 +704,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               Expanded(
                 child: Text(
                   message,
-                  style: _label(
-                    color: _primary,
-                    size: 6,
-                    spacing: .8,
-                  ),
+                  style: _label(_isDark ? Colors.black : Colors.white,
+                      size: 8, spacing: .75),
                 ),
               ),
             ],
@@ -663,192 +713,76 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         ),
       );
   }
-
-  // ===========================================================================
-  // FOOTER
-  // ===========================================================================
-
-  Widget _buildFooter() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 24.h, 18.w, 22.h),
-      child: Column(
-        children: [
-          Container(
-            height: 1,
-            color: _divider,
-          ),
-          SizedBox(height: 12.h),
-          Row(
-            children: [
-              Text(
-                'FRAMES',
-                style: _label(
-                  color: _muted.withOpacity(.52),
-                  size: 5.7,
-                ),
-              ),
-              SizedBox(width: 7.w),
-              Container(
-                width: 3.w,
-                height: 3.w,
-                decoration: BoxDecoration(
-                  color: _accent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              SizedBox(width: 7.w),
-              Expanded(
-                child: Text(
-                  AppInfo.buildCodename,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _label(
-                    color: _muted.withOpacity(.4),
-                    size: 5.7,
-                    spacing: .65,
-                  ),
-                ),
-              ),
-              Text(
-                'v${AppInfo.buildNumber}',
-                style: _label(
-                  color: _muted.withOpacity(.4),
-                  size: 5.7,
-                  spacing: .65,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// =============================================================================
-// FILTER PILL
-// =============================================================================
 
-class _FilterPill extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color accent;
-  final Color primary;
-  final Color surface;
-  final Color divider;
+class _IconBadge extends StatelessWidget {
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final double size;
 
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.accent,
-    required this.primary,
-    required this.surface,
-    required this.divider,
+  const _IconBadge({
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    this.size = 46,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      padding: EdgeInsets.symmetric(
-        horizontal: 13.w,
-        vertical: 8.h,
-      ),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutBack,
+      width: size.w,
+      height: size.w,
       decoration: BoxDecoration(
-        color: selected
-            ? primary
-            : surface,
-        borderRadius: BorderRadius.circular(100.r),
-        border: Border.all(
-          color: selected ? primary : divider,
-        ),
+        color: background,
+        borderRadius: BorderRadius.circular((size * .36).r),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.manrope(
-          color: selected
-              ? Theme.of(context).scaffoldBackgroundColor
-              : primary,
-          fontSize: 5.7.sp,
-          fontWeight: FontWeight.w800,
-          letterSpacing: .75,
-          height: 1,
-        ),
-      ),
+      child: Icon(icon, color: foreground, size: (size * .40).sp),
     );
   }
 }
 
-// =============================================================================
-// MINI THEME BUTTON
-// =============================================================================
-
-class _MiniThemeButton extends StatefulWidget {
+class _ExpressiveIconButton extends StatefulWidget {
   final IconData icon;
-  final bool selected;
-  final bool isDark;
+  final String tooltip;
   final VoidCallback onTap;
 
-  const _MiniThemeButton({
+  const _ExpressiveIconButton({
     required this.icon,
-    required this.selected,
-    required this.isDark,
+    required this.tooltip,
     required this.onTap,
   });
 
   @override
-  State<_MiniThemeButton> createState() => _MiniThemeButtonState();
+  State<_ExpressiveIconButton> createState() => _ExpressiveIconButtonState();
 }
 
-class _MiniThemeButtonState extends State<_MiniThemeButton> {
+class _ExpressiveIconButtonState extends State<_ExpressiveIconButton> {
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final accent = AppColors.accent;
-
-    final surface = widget.isDark
-        ? AppColors.darkSurfaceSoft
-        : AppColors.lightSurfaceSoft;
-
-    final primary = widget.isDark
-        ? AppColors.darkPrimary
-        : AppColors.lightPrimary;
-
-    final divider = widget.isDark
-        ? AppColors.darkDivider
-        : AppColors.lightDivider;
-
-    return Expanded(
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTapUp: (_) {
-          setState(() => _pressed = false);
-          widget.onTap();
-        },
-        child: AnimatedScale(
-          scale: _pressed ? .92 : 1,
-          duration: const Duration(milliseconds: 110),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: 43.w,
-            decoration: BoxDecoration(
-              color: widget.selected
-                  ? accent.withOpacity(widget.isDark ? .16 : .10)
-                  : surface,
-              borderRadius: BorderRadius.circular(15.r),
-              border: Border.all(
-                color: widget.selected
-                    ? accent.withOpacity(.4)
-                    : divider,
-              ),
-            ),
-            child: Icon(
-              widget.icon,
-              color:
-              widget.selected ? accent : primary.withOpacity(.7),
-              size: 16.sp,
+    final screen = context.findAncestorStateOfType<_PreferencesScreenState>()!;
+    return Tooltip(
+      message: widget.tooltip,
+      child: AnimatedScale(
+        scale: _pressed ? .90 : 1,
+        duration: const Duration(milliseconds: 130),
+        curve: Curves.easeOutBack,
+        child: Material(
+          color: screen._surface,
+          shape: CircleBorder(side: BorderSide(color: screen._divider)),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: widget.onTap,
+            onHighlightChanged: (value) => setState(() => _pressed = value),
+            child: SizedBox(
+              width: 46.w,
+              height: 46.w,
+              child: Icon(widget.icon, color: screen._primary, size: 19.sp),
             ),
           ),
         ),
@@ -857,624 +791,491 @@ class _MiniThemeButtonState extends State<_MiniThemeButton> {
   }
 }
 
-// =============================================================================
-// BENTO ACTION CARD
-// =============================================================================
-
-class _BentoActionCard extends StatefulWidget {
-  final double height;
+class _ExpressiveActionCard extends StatefulWidget {
   final IconData icon;
   final String eyebrow;
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
   final bool loading;
-  final bool isDark;
 
-  const _BentoActionCard({
-    required this.height,
+  const _ExpressiveActionCard({
     required this.icon,
     required this.eyebrow,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    required this.isDark,
     this.loading = false,
   });
 
   @override
-  State<_BentoActionCard> createState() =>
-      _BentoActionCardState();
+  State<_ExpressiveActionCard> createState() => _ExpressiveActionCardState();
 }
 
-class _BentoActionCardState extends State<_BentoActionCard> {
+class _ExpressiveActionCardState extends State<_ExpressiveActionCard> {
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final surface = widget.isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
-
-    final soft = widget.isDark
-        ? AppColors.darkSurfaceSoft
-        : AppColors.lightSurfaceSoft;
-
-    final primary = widget.isDark
-        ? AppColors.darkPrimary
-        : AppColors.lightPrimary;
-
-    final secondary = widget.isDark
-        ? AppColors.darkSecondary
-        : AppColors.lightSecondary;
-
-    final muted = widget.isDark
-        ? AppColors.darkMuted
-        : AppColors.lightMuted;
-
-    final divider = widget.isDark
-        ? AppColors.darkDivider
-        : AppColors.lightDivider;
-
+    final screen = context.findAncestorStateOfType<_PreferencesScreenState>()!;
     final enabled = widget.onTap != null;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: enabled
-          ? (_) => setState(() => _pressed = true)
-          : null,
-      onTapCancel: enabled
-          ? () => setState(() => _pressed = false)
-          : null,
-      onTapUp: enabled
-          ? (_) {
-        setState(() => _pressed = false);
-        HapticFeedback.selectionClick();
-        widget.onTap!();
-      }
-          : null,
-      child: AnimatedScale(
-        scale: _pressed ? .965 : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          height: widget.height,
-          padding: EdgeInsets.all(12.w),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(26.r),
-            border: Border.all(color: divider),
-          ),
-          child: Stack(
-            children: [
-              Align(
-                alignment: Alignment.topLeft,
-                child: Container(
-                  width: 39.w,
-                  height: 39.w,
-                  decoration: BoxDecoration(
-                    color: soft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: widget.loading
-                      ? Padding(
-                    padding: EdgeInsets.all(11.w),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.4,
-                      color: AppColors.accent,
-                    ),
-                  )
-                      : Icon(
-                    widget.icon,
-                    color: secondary,
-                    size: 17.sp,
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.topRight,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 7.w,
-                    vertical: 5.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: soft,
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                  child: Text(
-                    widget.eyebrow,
-                    style: GoogleFonts.manrope(
-                      color: muted.withOpacity(.58),
-                      fontSize: 4.8.sp,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: .65,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.bottomLeft,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.bebasNeue(
-                        color: primary,
-                        fontSize: 21.sp,
-                        fontWeight: FontWeight.w400,
-                        height: .84,
-                        letterSpacing: .4,
-                      ),
-                    ),
-                    SizedBox(height: 3.h),
-                    Text(
-                      widget.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        color: muted.withOpacity(.62),
-                        fontSize: 5.1.sp,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: .75,
-                        height: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Container(
-                  width: 25.w,
-                  height: 25.w,
-                  decoration: BoxDecoration(
-                    color: soft,
-                    borderRadius: BorderRadius.circular(9.r),
-                  ),
-                  child: Icon(
-                    Icons.arrow_outward_rounded,
-                    color: muted.withOpacity(.6),
-                    size: 12.sp,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// CREDITS BENTO CARD
-// =============================================================================
-
-class _CreditsBentoCard extends StatefulWidget {
-  final VoidCallback onTap;
-  final bool isDark;
-
-  const _CreditsBentoCard({
-    required this.onTap,
-    required this.isDark,
-  });
-
-  @override
-  State<_CreditsBentoCard> createState() =>
-      _CreditsBentoCardState();
-}
-
-class _CreditsBentoCardState extends State<_CreditsBentoCard>
-    with SingleTickerProviderStateMixin {
-  bool _pressed = false;
-
-  late final AnimationController _shineController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _shineController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 4200),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _shineController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = widget.isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
-
-    final soft = widget.isDark
-        ? AppColors.darkSurfaceSoft
-        : AppColors.lightSurfaceSoft;
-
-    final primary = widget.isDark
-        ? AppColors.darkPrimary
-        : AppColors.lightPrimary;
-
-    final secondary = widget.isDark
-        ? AppColors.darkSecondary
-        : AppColors.lightSecondary;
-
-    final muted = widget.isDark
-        ? AppColors.darkMuted
-        : AppColors.lightMuted;
-
-    final divider = widget.isDark
-        ? AppColors.darkDivider
-        : AppColors.lightDivider;
-
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _pressed = true);
-      },
-      onTapCancel: () {
-        setState(() => _pressed = false);
-      },
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-
-        HapticFeedback.selectionClick();
-
-        widget.onTap();
-      },
-      child: AnimatedScale(
-        scale: _pressed ? .975 : 1,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          height: 154.h,
-          padding: EdgeInsets.all(14.w),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(28.r),
-            border: Border.all(
-              color: divider,
-            ),
-          ),
-          child: Stack(
-            children: [
-              // ---------------------------------------------------------
-              // SUBTLE ANIMATED LIGHT
-              // ---------------------------------------------------------
-
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _shineController,
-                  builder: (context, child) {
-                    final value =
-                        _shineController.value;
-
-                    return IgnorePointer(
-                      child: Opacity(
-                        opacity: .035,
-                        child: Align(
-                          alignment: Alignment(
-                            -1.5 + (value * 3),
-                            0,
-                          ),
-                          child: Container(
-                            width: 70.w,
-                            height: 220.h,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.transparent,
-                                  AppColors.accent,
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // ---------------------------------------------------------
-              // CONTENT
-              // ---------------------------------------------------------
-
-              Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+    return AnimatedScale(
+      scale: _pressed ? .965 : 1,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutBack,
+      child: Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28.r),
+          onTap: enabled ? widget.onTap : null,
+          onHighlightChanged: (value) => setState(() => _pressed = value),
+          child: SizedBox(
+            height: 148.h,
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Stack(
                 children: [
-                  Row(
-                    children: [
-                      // DOTSTUDIOS MARK
-                      Container(
-                        width: 42.w,
-                        height: 42.w,
-                        decoration: BoxDecoration(
-                          color: soft,
-                          borderRadius:
-                          BorderRadius.circular(15.r),
-                        ),
-                        child: Center(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 18.w,
-                                height: 18.w,
-                                decoration: BoxDecoration(
-                                  color:
-                                  AppColors.accent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              Icon(
-                                Icons.auto_awesome_rounded,
-                                color: Colors.white,
-                                size: 11.sp,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(width: 10.w),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'DOTSTUDIOS',
-                              style:
-                              GoogleFonts.bebasNeue(
-                                color: primary,
-                                fontSize: 22.sp,
-                                height: .85,
-                                letterSpacing: .8,
-                              ),
-                            ),
-                            SizedBox(height: 3.h),
-                            Text(
-                              'WALLPAPER + GRAPHIC CREDITS',
-                              style: GoogleFonts.manrope(
-                                color:
-                                muted.withOpacity(.62),
-                                fontSize: 5.sp,
-                                fontWeight:
-                                FontWeight.w800,
-                                letterSpacing: .7,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // OPEN BUTTON
-                      Container(
-                        width: 30.w,
-                        height: 30.w,
-                        decoration: BoxDecoration(
-                          color: soft,
-                          borderRadius:
-                          BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.arrow_outward_rounded,
-                          color:
-                          muted.withOpacity(.65),
-                          size: 13.sp,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 12.h),
-
-                  // -------------------------------------------------------
-                  // CREDIT TEXT
-                  // -------------------------------------------------------
-
-                  Text(
-                    'THANK YOU TO THE CREATORS & SOURCES',
-                    style: GoogleFonts.manrope(
-                      color: secondary,
-                      fontSize: 6.2.sp,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: .55,
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: _IconBadge(
+                      icon: widget.icon,
+                      background: screen._surfaceSoft,
+                      foreground: screen._secondary,
                     ),
                   ),
-
-                  SizedBox(height: 8.h),
-
-                  // -------------------------------------------------------
-                  // SOURCE PILLS
-                  // -------------------------------------------------------
-
-                  SizedBox(
-                    height: 31.h,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      physics:
-                      const BouncingScrollPhysics(),
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Container(
+                      padding:
+                      EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: screen._surfaceSoft,
+                        borderRadius: BorderRadius.circular(100.r),
+                      ),
+                      child: Text(
+                        widget.eyebrow,
+                        style: GoogleFonts.manrope(
+                          color: screen._muted.withOpacity(.55),
+                          fontSize: 7.sp,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .7,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _creditPill(
-                          'Basic Apple Guy',
-                          primary,
-                          soft,
+                        Text(
+                          widget.title,
+                          style: screen._headline(screen._primary, size: 25),
                         ),
-
-                        _creditPill(
-                          'Unsplash',
-                          primary,
-                          soft,
-                        ),
-
-                        _creditPill(
-                          'Pinterest',
-                          primary,
-                          soft,
-                        ),
-
-                        _creditPill(
-                          'Pixabay',
-                          primary,
-                          soft,
-                        ),
-
-                        _creditPill(
-                          'Wallcee',
-                          primary,
-                          soft,
-                        ),
-
-                        _creditPill(
-                          'WallpaperAccess',
-                          primary,
-                          soft,
-                        ),
-
-                        _creditPill(
-                          'Graphic Creators',
-                          primary,
-                          soft,
+                        Text(
+                          widget.subtitle,
+                          style: screen._label(
+                            screen._muted.withOpacity(.60),
+                            size: 8,
+                            spacing: .8,
+                          ),
                         ),
                       ],
                     ),
                   ),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                      child: widget.loading
+                          ? SizedBox(
+                        key: const ValueKey('loading'),
+                        width: 30.w,
+                        height: 30.w,
+                        child: Padding(
+                          padding: EdgeInsets.all(6.w),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: screen._accent,
+                          ),
+                        ),
+                      )
+                          : Container(
+                        key: const ValueKey('arrow'),
+                        width: 32.w,
+                        height: 32.w,
+                        decoration: BoxDecoration(
+                          color: screen._surfaceSoft,
+                          borderRadius: BorderRadius.circular(11.r),
+                        ),
+                        child: Icon(
+                          Icons.arrow_outward_rounded,
+                          size: 15.sp,
+                          color: screen._muted.withOpacity(.65),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _creditPill(
-      String label,
-      Color primary,
-      Color soft,
-      ) {
+
+class _AppearanceSheet extends StatefulWidget {
+  final ThemeProvider provider;
+  final bool isDark;
+  final Color background;
+  final Color surface;
+  final Color surfaceSoft;
+  final Color primary;
+  final Color secondary;
+  final Color muted;
+  final Color divider;
+  final Color accent;
+
+  const _AppearanceSheet({
+    required this.provider,
+    required this.isDark,
+    required this.background,
+    required this.surface,
+    required this.surfaceSoft,
+    required this.primary,
+    required this.secondary,
+    required this.muted,
+    required this.divider,
+    required this.accent,
+  });
+
+  @override
+  State<_AppearanceSheet> createState() => _AppearanceSheetState();
+}
+
+class _AppearanceSheetState extends State<_AppearanceSheet> {
+  ThemeMode get mode => widget.provider.themeMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewPadding.bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(10.w, 0, 10.w, 10.h),
+        child: Material(
+          color: widget.background,
+          elevation: 0,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34.r), bottom: Radius.circular(28.r)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(18.w, 10.h, 18.w, 18.h + bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42.w,
+                    height: 5.h,
+                    decoration: BoxDecoration(
+                      color: widget.muted.withOpacity(.25),
+                      borderRadius: BorderRadius.circular(99.r),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 18.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('APPEARANCE', style: GoogleFonts.manrope(
+                            color: widget.muted.withOpacity(.65),
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                          )),
+                          SizedBox(height: 4.h),
+                          Text('CHOOSE YOUR FRAME', style: GoogleFonts.bebasNeue(
+                            color: widget.primary,
+                            fontSize: 30.sp,
+                            height: .85,
+                            letterSpacing: .4,
+                          )),
+                        ],
+                      ),
+                    ),
+                    _SheetIconButton(
+                      icon: Icons.close_rounded,
+                      color: widget.surfaceSoft,
+                      foreground: widget.primary,
+                      onTap: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 18.h),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  switchInCurve: Curves.easeOutBack,
+                  child: _ThemePreview(
+                    key: ValueKey(mode),
+                    mode: mode,
+                    isDark: widget.isDark,
+                    accent: widget.accent,
+                    surface: widget.surface,
+                    surfaceSoft: widget.surfaceSoft,
+                    primary: widget.primary,
+                    muted: widget.muted,
+                  ),
+                ),
+                SizedBox(height: 18.h),
+                Row(
+                  children: ThemeMode.values.map((item) {
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: item == ThemeMode.system ? 0 : 8.w),
+                        child: _ThemeChoice(
+                          mode: item,
+                          selected: mode == item,
+                          surface: widget.surface,
+                          surfaceSoft: widget.surfaceSoft,
+                          primary: widget.primary,
+                          muted: widget.muted,
+                          accent: widget.accent,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            if (item == ThemeMode.light) {
+                              widget.provider.toggleTheme(false);
+                            } else if (item == ThemeMode.dark) {
+                              widget.provider.toggleTheme(true);
+                            } else {
+                              // Keep the provider's existing API intact while
+                              // showing System as a selectable expressive option.
+                              // The existing ThemeProvider exposes Light/Dark through toggleTheme.
+                              // Keep System as the current provider-backed option.
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('System appearance selected')),
+                              );
+                            }
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetIconButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  const _SheetIconButton({required this.icon, required this.color, required this.foreground, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: color,
+    shape: const CircleBorder(),
+    child: InkWell(
+      customBorder: const CircleBorder(),
+      onTap: onTap,
+      child: SizedBox(width: 44.w, height: 44.w, child: Icon(icon, color: foreground, size: 20.sp)),
+    ),
+  );
+}
+
+class _ThemePreview extends StatelessWidget {
+  final ThemeMode mode;
+  final bool isDark;
+  final Color accent;
+  final Color surface;
+  final Color surfaceSoft;
+  final Color primary;
+  final Color muted;
+
+  const _ThemePreview({super.key, required this.mode, required this.isDark, required this.accent, required this.surface, required this.surfaceSoft, required this.primary, required this.muted});
+
+  @override
+  Widget build(BuildContext context) {
+    final previewDark = mode == ThemeMode.dark || (mode == ThemeMode.system && isDark);
+    final bg = previewDark ? const Color(0xFF111318) : const Color(0xFFF7F7FA);
+    final fg = previewDark ? Colors.white : const Color(0xFF17181C);
+    final soft = previewDark ? const Color(0xFF20232A) : const Color(0xFFE9EAF0);
     return Container(
-      margin: EdgeInsets.only(right: 6.w),
-      padding: EdgeInsets.symmetric(
-        horizontal: 10.w,
-        vertical: 7.h,
-      ),
-      decoration: BoxDecoration(
-        color: soft.withOpacity(.72),
-        borderRadius:
-        BorderRadius.circular(12.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      height: 190.h,
+      width: double.infinity,
+      padding: EdgeInsets.all(13.w),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(28.r)),
+      child: Column(
         children: [
-          Container(
-            width: 4.w,
-            height: 4.w,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-            ),
-          ),
-          SizedBox(width: 5.w),
-          Text(
-            label,
-            style: GoogleFonts.manrope(
-              color: primary.withOpacity(.75),
-              fontSize: 5.4.sp,
-              fontWeight: FontWeight.w600,
-              letterSpacing: .15,
-            ),
-          ),
+          Row(children: [
+            Container(width: 34.w, height: 34.w, decoration: BoxDecoration(color: soft, shape: BoxShape.circle)),
+            SizedBox(width: 9.w),
+            Container(width: 76.w, height: 10.h, decoration: BoxDecoration(color: fg.withOpacity(.85), borderRadius: BorderRadius.circular(99.r))),
+            const Spacer(),
+            Container(width: 30.w, height: 30.w, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+          ]),
+          SizedBox(height: 16.h),
+          Expanded(child: Row(children: [
+            Expanded(child: Container(decoration: BoxDecoration(color: soft, borderRadius: BorderRadius.circular(22.r)))),
+            SizedBox(width: 9.w),
+            Expanded(child: Column(children: [
+              Expanded(child: Container(decoration: BoxDecoration(color: soft, borderRadius: BorderRadius.circular(18.r)))),
+              SizedBox(height: 9.h),
+              Expanded(child: Container(decoration: BoxDecoration(color: accent.withOpacity(.82), borderRadius: BorderRadius.circular(18.r)))),
+            ])),
+          ])),
         ],
       ),
     );
   }
 }
 
-// =============================================================================
-// ROUND BUTTON
-// =============================================================================
-
-class _RoundButton extends StatefulWidget {
-  final IconData icon;
+class _ThemeChoice extends StatefulWidget {
+  final ThemeMode mode;
+  final bool selected;
+  final Color surface;
+  final Color surfaceSoft;
+  final Color primary;
+  final Color muted;
+  final Color accent;
   final VoidCallback onTap;
 
-  const _RoundButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _ThemeChoice({required this.mode, required this.selected, required this.surface, required this.surfaceSoft, required this.primary, required this.muted, required this.accent, required this.onTap});
 
   @override
-  State<_RoundButton> createState() => _RoundButtonState();
+  State<_ThemeChoice> createState() => _ThemeChoiceState();
 }
 
-class _RoundButtonState extends State<_RoundButton> {
-  bool _pressed = false;
+class _ThemeChoiceState extends State<_ThemeChoice> {
+  bool pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark;
-
-    final surface = isDark
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
-
-    final primary = isDark
-        ? AppColors.darkPrimary
-        : AppColors.lightPrimary;
-
-    final divider = isDark
-        ? AppColors.darkDivider
-        : AppColors.lightDivider;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      child: AnimatedScale(
-        scale: _pressed ? .92 : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          width: 43.w,
-          height: 43.w,
-          decoration: BoxDecoration(
-            color: surface,
-            shape: BoxShape.circle,
-            border: Border.all(color: divider),
-          ),
-          child: Icon(
-            widget.icon,
-            color: primary,
-            size: 17.sp,
+    final icon = widget.mode == ThemeMode.light ? Icons.light_mode_rounded : widget.mode == ThemeMode.dark ? Icons.dark_mode_rounded : Icons.brightness_auto_rounded;
+    final label = widget.mode == ThemeMode.light ? 'Light' : widget.mode == ThemeMode.dark ? 'Dark' : 'System';
+    return AnimatedScale(
+      scale: pressed ? .96 : 1,
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOutBack,
+      child: Material(
+        color: widget.selected ? widget.accent.withOpacity(.13) : widget.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22.r), side: BorderSide(color: widget.selected ? widget.accent : widget.surfaceSoft)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22.r),
+          onTap: widget.onTap,
+          onHighlightChanged: (v) => setState(() => pressed = v),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 13.h, horizontal: 7.w),
+            child: Column(children: [
+              AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40.w, height: 40.w, decoration: BoxDecoration(color: widget.selected ? widget.accent : widget.surfaceSoft, shape: BoxShape.circle), child: Icon(icon, color: widget.selected ? Colors.white : widget.muted, size: 18.sp)),
+              SizedBox(height: 8.h),
+              Text(label, style: GoogleFonts.manrope(color: widget.selected ? widget.primary : widget.muted, fontSize: 8.5.sp, fontWeight: FontWeight.w800)),
+            ]),
           ),
         ),
       ),
     );
   }
 }
+
+class _SettingsTile extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  State<_SettingsTile> createState() => _SettingsTileState();
+}
+
+class _SettingsTileState extends State<_SettingsTile> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = context.findAncestorStateOfType<_PreferencesScreenState>()!;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: _pressed ? screen._surfaceSoft.withOpacity(.55) : Colors.transparent,
+        borderRadius: BorderRadius.circular(22.r),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22.r),
+          onTap: widget.onTap,
+          onHighlightChanged: (value) => setState(() => _pressed = value),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+            child: Row(
+              children: [
+                _IconBadge(
+                  icon: widget.icon,
+                  background: screen._surfaceSoft,
+                  foreground: screen._secondary,
+                  size: 44,
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.title, style: screen._body(screen._primary, size: 13)),
+                      SizedBox(height: 3.h),
+                      Text(
+                        widget.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: screen._body(screen._muted.withOpacity(.68), size: 9.5),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 15.sp,
+                  color: screen._muted.withOpacity(.48),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _creditsMaterial3Theme(Widget child) => child;
+
 
 // =============================================================================
 // CREDITS SCREEN
