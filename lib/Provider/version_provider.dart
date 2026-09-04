@@ -3,11 +3,11 @@ class AppInfo {
   // FRAMES RELEASE IDENTITY
   // ============================================================
 
-  static const String appName = "Frames";
+  static const String appName = "frames";
 
-  static const String versionName = "3.1.0";
+  static const String versionName = "3.2.0";
 
-  static const String buildNumber = "302";
+  static const String buildNumber = "304";
 
   static const String buildCodename =
       "Still";

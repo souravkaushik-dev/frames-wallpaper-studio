@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final ScrollController _scrollController;
 
   Timer? _featuredTimer;
+  late final http.Client _httpClient;
 
 // ============================================================
 // DATA
@@ -87,6 +88,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     _scrollController = ScrollController();
 
+    _httpClient = http.Client();
+
     _dataFuture = fetchData();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -104,6 +107,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _featuredTimer?.cancel();
     _featuredController.dispose();
     _scrollController.dispose();
+    _httpClient.close();
 
     super.dispose();
   }
@@ -142,7 +146,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       throw Exception('API_URL is not configured');
     }
 
-    final response = await http.get(Uri.parse(apiUrl));
+    final response = await _httpClient
+        .get(
+      Uri.parse(apiUrl),
+      headers: const {
+        'Accept': 'application/json',
+        'Connection': 'keep-alive',
+      },
+    )
+        .timeout(const Duration(seconds: 8));
 
     if (response.statusCode != 200) {
       throw Exception('Failed to load wallpapers: ${response.statusCode}');
@@ -155,6 +167,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return Map<String, dynamic>.from(decoded);
+  }
+
+// ============================================================
+// IMAGE PREFETCH
+// ============================================================
+
+  void _precacheTrending(List<dynamic> trending) {
+    if (!mounted) return;
+
+    // Preload only the first few wallpapers so startup stays light.
+    // The rest load on demand and use Flutter's image cache.
+    final urls = trending
+        .take(4)
+        .map((item) => item.toString())
+        .where((url) => url.isNotEmpty)
+        .toList();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      for (final url in urls) {
+        precacheImage(
+          NetworkImage(url),
+          context,
+          onError: (_, __) {},
+        );
+      }
+    });
   }
 
 // ============================================================
@@ -344,30 +384,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           future: _dataFuture,
           builder: (context, snapshot) {
 // ------------------------------------------------
-// LOADING
+// NO BLOCKING LOADER
 // ------------------------------------------------
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return _buildLoading();
-            }
-
-// ------------------------------------------------
-// ERROR
-// ------------------------------------------------
+// The home UI renders immediately. Wallpaper data is inserted
+// as soon as the request completes, so there is no startup
+// loading screen or spinner.
 
             if (snapshot.hasError) {
               return _buildError();
             }
 
-// ------------------------------------------------
-// EMPTY
-// ------------------------------------------------
-
-            if (!snapshot.hasData) {
-              return _buildLoading();
-            }
-
-            final data = snapshot.data!;
+            final data = snapshot.data ?? const <String, dynamic>{};
 
             final List<dynamic> trending = List<dynamic>.from(
               data['trending'] ?? const [],
@@ -379,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
             if (trending.isNotEmpty) {
               _startFeaturedSlider(trending.length);
+              _precacheTrending(trending);
             }
 
             return _buildContent(trending: trending, categories: categories);
@@ -1008,43 +1036,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
 // ============================================================
-// LOADING
-// ============================================================
-
-  Widget _buildLoading() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 58.w,
-            height: 58.w,
-            decoration: BoxDecoration(
-              color: _accent.withOpacity(.10),
-              borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(color: _accent.withOpacity(.14)),
-            ),
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              color: _accent,
-              size: 25.sp,
-            ),
-          ),
-          SizedBox(height: 18.h),
-          Text(
-            'Loading wallpapers',
-            style: GoogleFonts.roboto(
-              color: _secondary,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// ============================================================
 // ERROR
 // ============================================================
 
@@ -1226,8 +1217,9 @@ class _FeaturedImageState extends State<_FeaturedImage>
         child: Image.network(
           widget.image,
           fit: BoxFit.cover,
-          filterQuality: FilterQuality.medium,
-          cacheWidth: 1200,
+          filterQuality: FilterQuality.low,
+          cacheWidth: 1000,
+          gaplessPlayback: true,
           errorBuilder: (context, error, stackTrace) => Container(
             color: Colors.black12,
             alignment: Alignment.center,
@@ -1326,7 +1318,8 @@ class _FeedWallpaperCard extends StatelessWidget {
                   image,
                   fit: BoxFit.cover,
                   filterQuality: FilterQuality.low,
-                  cacheWidth: 900,
+                  cacheWidth: 720,
+                  gaplessPlayback: true,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: Theme.of(context).brightness == Brightness.dark
@@ -1530,7 +1523,8 @@ class _CategoryTile extends StatelessWidget {
                 thumbnail,
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.low,
-                cacheWidth: 450,
+                cacheWidth: 360,
+                gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     color: dark
