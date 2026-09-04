@@ -9,15 +9,15 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
-class DesktopPage extends StatefulWidget {
-  const DesktopPage({super.key});
+class WidePage extends StatefulWidget {
+  const WidePage({super.key});
 
   @override
-  State<DesktopPage> createState() => _DesktopPageState();
+  State<WidePage> createState() => _WidePageState();
 }
 
-class _DesktopPageState extends State<DesktopPage> {
-  late Future<List<String>> _desktopFuture;
+class _WidePageState extends State<WidePage> {
+  late Future<List<String>> _wideFuture;
 
   // Index of the wallpaper currently expanded in the collection.
   int? _expandedIndex;
@@ -49,14 +49,14 @@ class _DesktopPageState extends State<DesktopPage> {
   @override
   void initState() {
     super.initState();
-    _desktopFuture = _fetchDesktopWallpapers();
+    _wideFuture = _fetchWideWallpapers();
   }
 
   // ===========================================================================
   // API
   // ===========================================================================
 
-  Future<List<String>> _fetchDesktopWallpapers() async {
+  Future<List<String>> _fetchWideWallpapers() async {
     final apiUrl = dotenv.env['API_URL'];
 
     if (apiUrl == null || apiUrl.trim().isEmpty) {
@@ -104,10 +104,10 @@ class _DesktopPageState extends State<DesktopPage> {
   Future<void> _refresh() async {
     HapticFeedback.selectionClick();
 
-    final future = _fetchDesktopWallpapers();
+    final future = _fetchWideWallpapers();
 
     setState(() {
-      _desktopFuture = future;
+      _wideFuture = future;
     });
 
     await future;
@@ -117,7 +117,7 @@ class _DesktopPageState extends State<DesktopPage> {
     HapticFeedback.selectionClick();
 
     setState(() {
-      _desktopFuture = _fetchDesktopWallpapers();
+      _wideFuture = _fetchWideWallpapers();
     });
   }
 
@@ -132,7 +132,7 @@ class _DesktopPageState extends State<DesktopPage> {
       body: SafeArea(
         bottom: false,
         child: FutureBuilder<List<String>>(
-          future: _desktopFuture,
+          future: _wideFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {
@@ -172,10 +172,10 @@ class _DesktopPageState extends State<DesktopPage> {
                         return RepaintBoundary(
                           child: Padding(
                             padding: EdgeInsets.only(bottom: 12.h),
-                            child: _AnimatedDesktopCard(
+                            child: _AnimatedWideCard(
                               key: ValueKey('${imageUrl}_$index'),
                               index: index,
-                              child: _DesktopCard(
+                              child: _WideCard(
                                 imageUrl: imageUrl,
                                 index: index,
                                 primary: _primary,
@@ -216,106 +216,11 @@ class _DesktopPageState extends State<DesktopPage> {
   // ===========================================================================
   // HEADER
   // ===========================================================================
-
   Widget _buildHeader(int count) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 13.h, 18.w, 15.h),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 7.w,
-                          height: 7.w,
-                          decoration: BoxDecoration(
-                            color: _accent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
-                        Text(
-                          'COLLECTION',
-                          style: GoogleFonts.manrope(
-                            color: _muted.withOpacity(.72),
-                            fontSize: 6.sp,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.1,
-                            height: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 9.h),
-                    Text(
-                      'DESKTOP',
-                      style: GoogleFonts.bebasNeue(
-                        color: _primary,
-                        fontSize: 50.sp,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: .15,
-                        height: .78,
-                      ),
-                    ),
-                    SizedBox(height: 2.h),
-                    Text(
-                      '4K WALLPAPERS',
-                      style: GoogleFonts.bebasNeue(
-                        color: _muted,
-                        fontSize: 24.sp,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: .65,
-                        height: .9,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 10.w),
-              _CountBadge(
-                count: count,
-                surface: _surfaceSoft,
-                primary: _primary,
-                muted: _muted,
-              ),
-              SizedBox(width: 7.w),
-            ],
-          ),
-
-          SizedBox(height: 17.h),
-
-          Row(
-            children: [
-              _FilterPill(
-                label: 'ALL',
-                selected: true,
-                accent: _accent,
-                primary: _primary,
-                surface: _surface,
-                divider: _divider,
-              ),
-              SizedBox(width: 7.w),
-              const Spacer(),
-              Text(
-                '$count WALLPAPERS',
-                style: GoogleFonts.manrope(
-                  color: _muted.withOpacity(.52),
-                  fontSize: 5.4.sp,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: .8,
-                  height: 1,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return SizedBox(
+      height: 105.h,
+      width: double.infinity,
+      child: ClipRect(child: _MovingWideHeader()),
     );
   }
 
@@ -336,7 +241,7 @@ class _DesktopPageState extends State<DesktopPage> {
         transitionDuration: const Duration(milliseconds: 400),
         reverseTransitionDuration: const Duration(milliseconds: 280),
         pageBuilder: (context, animation, secondaryAnimation) {
-          return PreviewScreen(imageUrl: imageUrl, category: 'Desktop 4K');
+          return PreviewScreen(imageUrl: imageUrl, category: 'Wide 4K');
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final curved = CurvedAnimation(
@@ -414,7 +319,7 @@ class _DesktopPageState extends State<DesktopPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'DESKTOP 4K',
+                          'WIDE 4K',
                           style: GoogleFonts.bebasNeue(
                             color: primary,
                             fontSize: 22.sp,
@@ -425,7 +330,7 @@ class _DesktopPageState extends State<DesktopPage> {
                         SizedBox(height: 4.h),
                         Text(
                           '$count wallpapers in this collection.',
-                          style: GoogleFonts.manrope(
+                          style: GoogleFonts.googleSansFlex(
                             color: secondary,
                             fontSize: 7.5.sp,
                             fontWeight: FontWeight.w500,
@@ -491,9 +396,9 @@ class _DesktopPageState extends State<DesktopPage> {
             ),
             SizedBox(height: 8.h),
             Text(
-              'Unable to load desktop wallpapers.',
+              'Unable to load wide wallpapers.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.googleSansFlex(
                 fontSize: 9.sp,
                 fontWeight: FontWeight.w500,
                 color: _secondary,
@@ -540,7 +445,7 @@ class _DesktopPageState extends State<DesktopPage> {
             ),
             SizedBox(height: 19.h),
             Text(
-              'NO DESKTOP WALLPAPERS',
+              'NO WIDE WALLPAPERS',
               textAlign: TextAlign.center,
               style: GoogleFonts.bebasNeue(
                 fontSize: 27.sp,
@@ -550,9 +455,9 @@ class _DesktopPageState extends State<DesktopPage> {
             ),
             SizedBox(height: 8.h),
             Text(
-              'The desktop collection is empty.',
+              'The wide collection is empty.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.googleSansFlex(
                 fontSize: 9.sp,
                 fontWeight: FontWeight.w500,
                 color: _secondary,
@@ -569,21 +474,21 @@ class _DesktopPageState extends State<DesktopPage> {
 // ANIMATED CARD ENTRY
 // =============================================================================
 
-class _AnimatedDesktopCard extends StatefulWidget {
+class _AnimatedWideCard extends StatefulWidget {
   final int index;
   final Widget child;
 
-  const _AnimatedDesktopCard({
+  const _AnimatedWideCard({
     super.key,
     required this.index,
     required this.child,
   });
 
   @override
-  State<_AnimatedDesktopCard> createState() => _AnimatedDesktopCardState();
+  State<_AnimatedWideCard> createState() => _AnimatedWideCardState();
 }
 
-class _AnimatedDesktopCardState extends State<_AnimatedDesktopCard>
+class _AnimatedWideCardState extends State<_AnimatedWideCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
@@ -638,7 +543,7 @@ class _AnimatedDesktopCardState extends State<_AnimatedDesktopCard>
 // DESKTOP CARD
 // =============================================================================
 
-class _DesktopCard extends StatefulWidget {
+class _WideCard extends StatefulWidget {
   final String imageUrl;
   final int index;
 
@@ -654,7 +559,7 @@ class _DesktopCard extends StatefulWidget {
   final VoidCallback onToggleExtend;
   final VoidCallback onTap;
 
-  const _DesktopCard({
+  const _WideCard({
     required this.imageUrl,
     required this.index,
     required this.primary,
@@ -670,10 +575,10 @@ class _DesktopCard extends StatefulWidget {
   });
 
   @override
-  State<_DesktopCard> createState() => _DesktopCardState();
+  State<_WideCard> createState() => _WideCardState();
 }
 
-class _DesktopCardState extends State<_DesktopCard>
+class _WideCardState extends State<_WideCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _imageController;
   bool _pressed = false;
@@ -793,25 +698,13 @@ class _DesktopCardState extends State<_DesktopCard>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _getName(widget.imageUrl),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.bebasNeue(
-                              color: Colors.white,
-                              fontSize: 24.sp,
-                              fontWeight: FontWeight.w400,
-                              height: .78,
-                              letterSpacing: .2,
-                            ),
-                          ),
                           SizedBox(height: 5.h),
                           Text(
-                            'DESKTOP • 4K',
-                            style: GoogleFonts.manrope(
+                            'WIDE • 4K',
+                            style: GoogleFonts.googleSansFlex(
                               color: Colors.white.withOpacity(.72),
                               fontSize: 5.6.sp,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w500,
                               letterSpacing: .85,
                               height: 1,
                             ),
@@ -820,13 +713,6 @@ class _DesktopCardState extends State<_DesktopCard>
                       ),
                     ),
                     SizedBox(width: 8.w),
-                    _CircleIconButton(
-                      icon: Icons.arrow_outward_rounded,
-                      foreground: Colors.white,
-                      background: Colors.white.withOpacity(.18),
-                      border: Colors.white.withOpacity(.22),
-                      onTap: widget.onTap,
-                    ),
                   ],
                 ),
               ),
@@ -893,36 +779,6 @@ class _DesktopCardState extends State<_DesktopCard>
     );
   }
 
-  void _showCardMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-
-        final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-
-        final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
-
-        final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
-
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
-            child: Container(
-              padding: EdgeInsets.all(10.w),
-              decoration: BoxDecoration(
-                color: surface,
-                borderRadius: BorderRadius.circular(30.r),
-                border: Border.all(color: divider),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   String _getName(String url) {
     try {
       final uri = Uri.tryParse(url);
@@ -946,7 +802,7 @@ class _DesktopCardState extends State<_DesktopCard>
       value = value.replaceAll(RegExp(r'[_-]+'), ' ').trim();
 
       if (value.isEmpty) {
-        return 'DESKTOP';
+        return 'WIDE';
       }
 
       return value
@@ -962,114 +818,12 @@ class _DesktopCardState extends State<_DesktopCard>
           })
           .join(' ');
     } catch (_) {
-      return 'DESKTOP';
+      return 'WIDE';
     }
   }
 }
 
-// =============================================================================
-// COUNT BADGE
-// =============================================================================
 
-class _CountBadge extends StatelessWidget {
-  final int count;
-  final Color surface;
-  final Color primary;
-  final Color muted;
-
-  const _CountBadge({
-    required this.count,
-    required this.surface,
-    required this.primary,
-    required this.muted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 67.w,
-      height: 67.w,
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(23.r),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '$count',
-            style: GoogleFonts.bebasNeue(
-              fontSize: 27.sp,
-              color: primary,
-              height: .82,
-            ),
-          ),
-          SizedBox(height: 3.h),
-          Text(
-            'ITEMS',
-            style: GoogleFonts.manrope(
-              fontSize: 5.5.sp,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .7,
-              color: muted,
-              height: 1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// FILTER PILL
-// =============================================================================
-
-class _FilterPill extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color accent;
-  final Color primary;
-  final Color surface;
-  final Color divider;
-
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.accent,
-    required this.primary,
-    required this.surface,
-    required this.divider,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
-      decoration: BoxDecoration(
-        color: selected ? primary : surface,
-        borderRadius: BorderRadius.circular(100.r),
-        border: Border.all(color: selected ? primary : divider),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.manrope(
-          color: selected
-              ? (isDark ? AppColors.darkBackground : AppColors.lightBackground)
-              : primary,
-          fontSize: 5.5.sp,
-          fontWeight: FontWeight.w800,
-          letterSpacing: .75,
-          height: 1,
-        ),
-      ),
-    );
-  }
-}
 
 // =============================================================================
 // TOP BUTTON
@@ -1165,10 +919,10 @@ class _GlassPill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: GoogleFonts.manrope(
+        style: GoogleFonts.googleSansFlex(
           color: foreground,
           fontSize: 5.5.sp,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w500,
           letterSpacing: .45,
           height: 1,
         ),
@@ -1233,10 +987,10 @@ class _ExtendButtonState extends State<_ExtendButton> {
               SizedBox(width: 5.w),
               Text(
                 widget.expanded ? 'COLLAPSE' : 'EXTEND',
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.googleSansFlex(
                   color: Colors.white,
                   fontSize: 5.3.sp,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w500,
                   letterSpacing: .65,
                   height: 1,
                 ),
@@ -1374,9 +1128,9 @@ class _ActionButtonState extends State<_ActionButton> {
           ),
           child: Text(
             widget.label,
-            style: GoogleFonts.manrope(
+            style: GoogleFonts.googleSansFlex(
               fontSize: 8.sp,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
               letterSpacing: .9,
               color: widget.primary,
               height: 1,
@@ -1522,14 +1276,114 @@ class _BottomSheetActionState extends State<_BottomSheetAction> {
             SizedBox(width: 12.w),
             Text(
               widget.label,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.googleSansFlex(
                 color: widget.color,
                 fontSize: 7.sp,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w500,
                 letterSpacing: .75,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MovingWideHeader extends StatefulWidget {
+  const _MovingWideHeader();
+
+  @override
+  State<_MovingWideHeader> createState() => _MovingWideHeaderState();
+}
+
+class _MovingWideHeaderState extends State<_MovingWideHeader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _text(Color primary) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(
+        6,
+        (index) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'WIDE',
+              style: GoogleFonts.bebasNeue(
+                color: primary,
+                fontSize: 72.sp,
+                fontWeight: FontWeight.w400,
+                height: .85,
+                letterSpacing: .5,
+              ),
+            ),
+            SizedBox(width: 18.w),
+            Text(
+              '✱',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(
+                color: const Color(0xFF79B85B),
+                fontSize: 42.sp,
+                height: .8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(width: 18.w),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
+
+    return SizedBox(
+      height: 105.h,
+      width: double.infinity,
+      child: ClipRect(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                AnimatedBuilder(
+                  animation: _controller,
+                  child: _text(primary),
+                  builder: (context, child) {
+                    final screenWidth = constraints.maxWidth;
+
+                    return Positioned(
+                      left: -screenWidth * _controller.value,
+                      top: 12.h,
+                      child: child!,
+                    );
+                  },
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

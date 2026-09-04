@@ -2,874 +2,620 @@ import 'package:dotty/constants/app_colors.dart';
 import 'package:dotty/screens/previewscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hicons/flutter_hicons.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class CategoryScreen extends StatefulWidget {
-  final String title;
-  final List<String> wallpapers;
+final String title;
+final List<String> wallpapers;
 
-  const CategoryScreen({
-    super.key,
-    required this.title,
-    required this.wallpapers,
-  });
+const CategoryScreen({
+super.key,
+required this.title,
+required this.wallpapers,
+});
 
-  @override
-  State<CategoryScreen> createState() => _CategoryScreenState();
+@override
+State<CategoryScreen> createState() => _CategoryScreenState();
 }
 
 class _CategoryScreenState extends State<CategoryScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _introController;
+with SingleTickerProviderStateMixin {
+late final AnimationController _headerController;
 
-  @override
-  void initState() {
-    super.initState();
+@override
+void initState() {
+super.initState();
 
-    _introController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 650),
-    );
+_headerController = AnimationController(
+vsync: this,
+duration: const Duration(seconds: 18),
+)..repeat();
+}
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _introController.forward();
-      }
-    });
-  }
+@override
+void dispose() {
+_headerController.dispose();
+super.dispose();
+}
 
-  @override
-  void dispose() {
-    _introController.dispose();
-    super.dispose();
-  }
+// ============================================================
+// THEME
+// ============================================================
 
-  // ============================================================
-  // THEME
-  // ============================================================
+bool _isDark(BuildContext context) {
+return Theme.of(context).brightness == Brightness.dark;
+}
 
-  bool _isDark(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.dark;
-  }
+Color _background(BuildContext context) {
+return _isDark(context)
+? AppColors.darkBackground
+    : AppColors.lightBackground;
+}
 
-  Color _background(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkBackground
-        : AppColors.lightBackground;
-  }
+Color _surface(BuildContext context) {
+return _isDark(context)
+? AppColors.darkSurface
+    : AppColors.lightSurface;
+}
 
-  Color _surface(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkSurface
-        : AppColors.lightSurface;
-  }
+Color _primary(BuildContext context) {
+return _isDark(context)
+? AppColors.darkPrimary
+    : AppColors.lightPrimary;
+}
 
-  Color _surfaceSoft(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkSurfaceSoft
-        : AppColors.lightSurfaceSoft;
-  }
+Color _muted(BuildContext context) {
+return _isDark(context)
+? AppColors.darkMuted
+    : AppColors.lightMuted;
+}
 
-  Color _primary(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkPrimary
-        : AppColors.lightPrimary;
-  }
+Color get _accent => AppColors.accent;
 
-  Color _secondary(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkSecondary
-        : AppColors.lightSecondary;
-  }
+// ============================================================
+// BUILD
+// ============================================================
 
-  Color _muted(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkMuted
-        : AppColors.lightMuted;
-  }
+@override
+Widget build(BuildContext context) {
+final background = _background(context);
+final surface = _surface(context);
+final primary = _primary(context);
+final muted = _muted(context);
 
-  Color _divider(BuildContext context) {
-    return _isDark(context)
-        ? AppColors.darkDivider
-        : AppColors.lightDivider;
-  }
+return Scaffold(
+backgroundColor: background,
+body: CustomScrollView(
+physics: const BouncingScrollPhysics(
+parent: AlwaysScrollableScrollPhysics(),
+),
+cacheExtent: 900,
+slivers: [
+// ======================================================
+// BIG MOVING CATEGORY NAME
+// ======================================================
 
-  Color get _accent => AppColors.accent;
+SliverToBoxAdapter(
+child: SafeArea(
+bottom: false,
+child: Padding(
+padding: EdgeInsets.only(
+top: 6.h,
+bottom: 12.h,
+),
+child: _BigCategoryHeader(
+title: widget.title,
+controller: _headerController,
+primary: primary,
+accent: _accent,
+),
+),
+),
+),
 
-  // ============================================================
-  // BUILD
-  // ============================================================
+// ======================================================
+// BACK + COUNT GLASS CONTROLS
+// ======================================================
 
-  @override
-  Widget build(BuildContext context) {
-    final bg = _background(context);
-    final surface = _surface(context);
-    final surfaceSoft = _surfaceSoft(context);
-    final primary = _primary(context);
-    final secondary = _secondary(context);
-    final muted = _muted(context);
-    final divider = _divider(context);
+SliverToBoxAdapter(
+child: Padding(
+padding: EdgeInsets.fromLTRB(
+14.w,
+0,
+14.w,
+16.h,
+),
+child: Row(
+children: [
+_BackButton(
+onTap: () {
+HapticFeedback.selectionClick();
+Navigator.pop(context);
+},
+),
 
-    return Scaffold(
-      backgroundColor: bg,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            cacheExtent: 800,
-            slivers: [
-              // ======================================================
-              // HEADER
-              // ======================================================
+const Spacer(),
 
-              SliverToBoxAdapter(
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      16.w,
-                      12.h,
-                      16.w,
-                      0,
-                    ),
-                    child: _Header(
-                      title: widget.title,
-                      count: widget.wallpapers.length,
-                      surface: surface,
-                      surfaceSoft: surfaceSoft,
-                      divider: divider,
-                      primary: primary,
-                      secondary: secondary,
-                      accent: _accent,
-                      onBack: () {
-                        HapticFeedback.selectionClick();
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ),
-                ),
-              ),
+_GlassCountPill(
+count: widget.wallpapers.length,
+),
+],
+),
+),
+),
 
-              // ======================================================
-              // HERO
-              // ======================================================
+// ======================================================
+// EMPTY STATE
+// ======================================================
 
-              SliverToBoxAdapter(
-                child: _AnimatedIntro(
-                  controller: _introController,
-                  child: _Hero(
-                    image: widget.wallpapers.isEmpty
-                        ? null
-                        : widget.wallpapers.first,
-                    title: widget.title,
-                    count: widget.wallpapers.length,
-                    background: bg,
-                    surface: surface,
-                    primary: primary,
-                    secondary: secondary,
-                    muted: muted,
-                    divider: divider,
-                    accent: _accent,
-                    onTap: widget.wallpapers.isEmpty
-                        ? null
-                        : () {
-                      _openPreview(
-                        context,
-                        widget.wallpapers.first,
-                      );
-                    },
-                  ),
-                ),
-              ),
+if (widget.wallpapers.isEmpty)
+SliverFillRemaining(
+hasScrollBody: false,
+child: _EmptyState(
+primary: primary,
+muted: muted,
+accent: _accent,
+),
+)
 
-              // ======================================================
-              // SMALL SECTION TITLE
-              // ======================================================
+// ======================================================
+// WALLPAPER GRID
+// ======================================================
 
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    20.w,
-                    2.h,
-                    20.w,
-                    14.h,
-                  ),
-                  child: Row(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'COLLECTION',
-                        style: GoogleFonts.bebasNeue(
-                          color: primary,
-                          fontSize: 28.sp,
-                          height: .9,
-                          letterSpacing: .2,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        width: 6.w,
-                        height: 6.w,
-                        decoration: BoxDecoration(
-                          color: _accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      SizedBox(width: 7.w),
-                      Text(
-                        widget.wallpapers.length
-                            .toString()
-                            .padLeft(2, '0'),
-                        style: GoogleFonts.manrope(
-                          color: muted,
-                          fontSize: 8.sp,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+else
+SliverPadding(
+padding: EdgeInsets.fromLTRB(
+14.w,
+0,
+14.w,
+70.h,
+),
+sliver: SliverMasonryGrid.count(
+crossAxisCount: 2,
+mainAxisSpacing: 12.h,
+crossAxisSpacing: 10.w,
+childCount: widget.wallpapers.length,
+itemBuilder: (
+context,
+index,
+) {
+final image = widget.wallpapers[index];
 
-              // ======================================================
-              // GRID
-              // ======================================================
+return RepaintBoundary(
+key: ValueKey(image),
+child: _WallpaperCard(
+image: image,
+index: index,
+accent: _accent,
+surface: surface,
+primary: primary,
+muted: muted,
+onTap: () {
+_openPreview(
+context,
+image,
+);
+},
+),
+);
+},
+),
+),
 
-              if (widget.wallpapers.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyState(
-                    primary: primary,
-                    secondary: secondary,
-                    accent: _accent,
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    14.w,
-                    0,
-                    14.w,
-                    80.h,
-                  ),
-                  sliver: SliverMasonryGrid.count(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10.h,
-                    crossAxisSpacing: 10.w,
-                    childCount: widget.wallpapers.length,
-                    itemBuilder: (
-                        context,
-                        index,
-                        ) {
-                      final image =
-                      widget.wallpapers[index];
+// ======================================================
+// END MARK
+// ======================================================
 
-                      return RepaintBoundary(
-                        key: ValueKey(image),
-                        child: _WallpaperCard(
-                          image: image,
-                          index: index,
-                          title: widget.title,
-                          accent: _accent,
-                          surface: surface,
-                          primary: primary,
-                          muted: muted,
-                          divider: divider,
-                          onTap: () {
-                            _openPreview(
-                              context,
-                              image,
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
+SliverToBoxAdapter(
+child: Padding(
+padding: EdgeInsets.only(
+bottom: 90.h,
+),
+child: _EndMark(
+divider: _isDark(context)
+? AppColors.darkDivider
+    : AppColors.lightDivider,
+muted: muted,
+),
+),
+),
+],
+),
+);
+}
 
-              // ======================================================
-              // END
-              // ======================================================
+// ============================================================
+// OPEN PREVIEW
+// ============================================================
 
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: 100.h,
-                  ),
-                  child: _EndMark(
-                    divider: divider,
-                    muted: muted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+void _openPreview(
+BuildContext context,
+String image,
+) {
+HapticFeedback.selectionClick();
 
-  // ============================================================
-  // PREVIEW
-  // ============================================================
+Navigator.push(
+context,
+PageRouteBuilder(
+transitionDuration: const Duration(
+milliseconds: 450,
+),
+reverseTransitionDuration: const Duration(
+milliseconds: 350,
+),
+pageBuilder: (
+context,
+animation,
+secondaryAnimation,
+) {
+return PreviewScreen(
+imageUrl: image,
+category: widget.title,
+);
+},
+transitionsBuilder: (
+context,
+animation,
+secondaryAnimation,
+child,
+) {
+final curved = CurvedAnimation(
+parent: animation,
+curve: Curves.easeOutCubic,
+reverseCurve: Curves.easeInCubic,
+);
 
-  void _openPreview(
-      BuildContext context,
-      String image,
-      ) {
-    HapticFeedback.selectionClick();
-
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        transitionDuration: const Duration(
-          milliseconds: 380,
-        ),
-        reverseTransitionDuration: const Duration(
-          milliseconds: 260,
-        ),
-        pageBuilder: (
-            _,
-            animation,
-            __,
-            ) {
-          return PreviewScreen(
-            imageUrl: image,
-            category: widget.title,
-          );
-        },
-        transitionsBuilder: (
-            _,
-            animation,
-            __,
-            child,
-            ) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-
-          return FadeTransition(
-            opacity: curved,
-            child: ScaleTransition(
-              scale: Tween<double>(
-                begin: .975,
-                end: 1,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-      ),
-    );
-  }
+return FadeTransition(
+opacity: Tween<double>(
+begin: 0,
+end: 1,
+).animate(curved),
+child: ScaleTransition(
+scale: Tween<double>(
+begin: .95,
+end: 1,
+).animate(curved),
+child: child,
+),
+);
+},
+),
+);
+}
 }
 
 // ============================================================================
-// ANIMATED INTRO
+// ADAPTIVE GLASS SYSTEM
 // ============================================================================
 
-class _AnimatedIntro extends StatelessWidget {
-  final AnimationController controller;
-  final Widget child;
+class _GlassStyle {
+static bool isDark(BuildContext context) {
+return Theme.of(context).brightness == Brightness.dark;
+}
 
-  const _AnimatedIntro({
-    required this.controller,
-    required this.child,
-  });
+// ------------------------------------------------------------
+// GLASS BACKGROUND
+// ------------------------------------------------------------
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      child: child,
-      builder: (
-          context,
-          child,
-          ) {
-        final value = Curves.easeOutCubic.transform(
-          controller.value,
-        );
+static Color background(BuildContext context) {
+if (isDark(context)) {
+return Colors.white.withOpacity(.085);
+}
 
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(
-              0,
-              20.h * (1 - value),
-            ),
-            child: child,
-          ),
-        );
-      },
-    );
-  }
+return Colors.white.withOpacity(.72);
+}
+
+// ------------------------------------------------------------
+// GLASS BORDER
+// ------------------------------------------------------------
+
+static Color border(BuildContext context) {
+if (isDark(context)) {
+return Colors.white.withOpacity(.15);
+}
+
+return Colors.white.withOpacity(.62);
+}
+
+// ------------------------------------------------------------
+// MAIN FOREGROUND
+// ------------------------------------------------------------
+
+static Color foreground(BuildContext context) {
+if (isDark(context)) {
+return Colors.white;
+}
+
+return const Color(0xFF111111);
+}
+
+// ------------------------------------------------------------
+// SECONDARY FOREGROUND
+// ------------------------------------------------------------
+
+static Color mutedForeground(BuildContext context) {
+if (isDark(context)) {
+return Colors.white.withOpacity(.56);
+}
+
+return const Color(0xFF111111).withOpacity(.52);
+}
+
+// ------------------------------------------------------------
+// SHADOW
+// ------------------------------------------------------------
+
+static List<BoxShadow> shadow(BuildContext context) {
+if (isDark(context)) {
+return [
+BoxShadow(
+color: Colors.black.withOpacity(.20),
+blurRadius: 18,
+offset: const Offset(
+0,
+6,
+),
+),
+];
+}
+
+return [
+BoxShadow(
+color: Colors.black.withOpacity(.065),
+blurRadius: 16,
+offset: const Offset(
+0,
+5,
+),
+),
+];
+}
+
+// ------------------------------------------------------------
+// PRESSED GLASS
+// ------------------------------------------------------------
+
+static Color pressedBackground(BuildContext context) {
+if (isDark(context)) {
+return Colors.white.withOpacity(.14);
+}
+
+return Colors.white.withOpacity(.86);
+}
 }
 
 // ============================================================================
-// HEADER
+// BIG MOVING CATEGORY HEADER
 // ============================================================================
 
-class _Header extends StatelessWidget {
-  final String title;
-  final int count;
+class _BigCategoryHeader extends StatelessWidget {
+final String title;
+final AnimationController controller;
+final Color primary;
+final Color accent;
 
-  final Color surface;
-  final Color surfaceSoft;
-  final Color divider;
-  final Color primary;
-  final Color secondary;
-  final Color accent;
+const _BigCategoryHeader({
+required this.title,
+required this.controller,
+required this.primary,
+required this.accent,
+});
 
-  final VoidCallback onBack;
+TextStyle get _titleStyle {
+return GoogleFonts.bebasNeue(
+color: primary,
+fontSize: 94.sp,
+fontWeight: FontWeight.w900,
+height: .78,
+letterSpacing: -1.8,
+);
+}
 
-  const _Header({
-    required this.title,
-    required this.count,
-    required this.surface,
-    required this.surfaceSoft,
-    required this.divider,
-    required this.primary,
-    required this.secondary,
-    required this.accent,
-    required this.onBack,
-  });
+@override
+Widget build(BuildContext context) {
+final text = title.toUpperCase();
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _CircleButton(
-          icon: Icons.arrow_back_ios_new_rounded,
-          background: surfaceSoft,
-          border: divider,
-          foreground: primary,
-          onTap: onBack,
-        ),
+final gap = 22.w;
+final symbolWidth = 58.w;
 
-        SizedBox(width: 12.w),
+return SizedBox(
+height: 118.h,
+child: ClipRect(
+child: LayoutBuilder(
+builder: (
+context,
+constraints,
+) {
+final painter = TextPainter(
+text: TextSpan(
+text: text,
+style: _titleStyle,
+),
+textDirection: TextDirection.ltr,
+maxLines: 1,
+)..layout();
 
-        Expanded(
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 5.w,
-                    height: 5.w,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  SizedBox(width: 7.w),
-                  Text(
-                    'ATMOSPHERE',
-                    style: GoogleFonts.manrope(
-                      color: secondary,
-                      fontSize: 7.sp,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.7,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 2.h),
-              Text(
-                title.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.manrope(
-                  color: primary,
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.4,
-                ),
-              ),
-            ],
-          ),
-        ),
+final cycleWidth =
+painter.width +
+gap +
+symbolWidth +
+gap;
 
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 10.w,
-            vertical: 8.h,
-          ),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(
-              13.r,
-            ),
-            border: Border.all(
-              color: divider,
-            ),
-          ),
-          child: Text(
-            count.toString().padLeft(2, '0'),
-            style: GoogleFonts.manrope(
-              color: primary,
-              fontSize: 8.sp,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+return AnimatedBuilder(
+animation: controller,
+builder: (
+context,
+child,
+) {
+final offset =
+-cycleWidth +
+(cycleWidth * controller.value);
+
+return Transform.translate(
+offset: Offset(
+offset,
+0,
+),
+child: OverflowBox(
+alignment: Alignment.centerLeft,
+maxWidth: double.infinity,
+child: Row(
+mainAxisSize: MainAxisSize.min,
+children: [
+_MarqueeTitle(
+text: text,
+style: _titleStyle,
+gap: gap,
+symbolWidth: symbolWidth,
+accent: accent,
+),
+_MarqueeTitle(
+text: text,
+style: _titleStyle,
+gap: gap,
+symbolWidth: symbolWidth,
+accent: accent,
+),
+_MarqueeTitle(
+text: text,
+style: _titleStyle,
+gap: gap,
+symbolWidth: symbolWidth,
+accent: accent,
+),
+_MarqueeTitle(
+text: text,
+style: _titleStyle,
+gap: gap,
+symbolWidth: symbolWidth,
+accent: accent,
+),
+],
+),
+),
+);
+},
+);
+},
+),
+),
+);
+}
 }
 
 // ============================================================================
-// HERO
+// MARQUEE ITEM
 // ============================================================================
 
-class _Hero extends StatelessWidget {
-  final String? image;
-  final String title;
-  final int count;
+class _MarqueeTitle extends StatelessWidget {
+final String text;
+final TextStyle style;
+final double gap;
+final double symbolWidth;
+final Color accent;
 
-  final Color background;
-  final Color surface;
-  final Color primary;
-  final Color secondary;
-  final Color muted;
-  final Color divider;
-  final Color accent;
+const _MarqueeTitle({
+required this.text,
+required this.style,
+required this.gap,
+required this.symbolWidth,
+required this.accent,
+});
 
-  final VoidCallback? onTap;
+@override
+Widget build(BuildContext context) {
+return Row(
+mainAxisSize: MainAxisSize.min,
+children: [
+Text(
+text,
+maxLines: 1,
+softWrap: false,
+style: style,
+),
 
-  const _Hero({
-    required this.image,
-    required this.title,
-    required this.count,
-    required this.background,
-    required this.surface,
-    required this.primary,
-    required this.secondary,
-    required this.muted,
-    required this.divider,
-    required this.accent,
-    required this.onTap,
-  });
+SizedBox(
+width: gap,
+),
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        14.w,
-        18.h,
-        14.w,
-        24.h,
-      ),
-      child: GestureDetector(
-        onTap: onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(
-            30.r,
-          ),
-          child: SizedBox(
-            height: 475.h,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // ==================================================
-                // IMAGE
-                // ==================================================
+SizedBox(
+width: symbolWidth,
+child: Text(
+'✱',
+textAlign: TextAlign.center,
+style: GoogleFonts.googleSansFlex(
+color: const Color(0xFF79B85B),
+fontSize: 42.sp,
+height: .8,
+fontWeight: FontWeight.w600,
+),
+),
+),
 
-                if (image != null)
-                  Image.network(
-                    image!,
-                    fit: BoxFit.cover,
-                    cacheWidth: 1000,
-                    filterQuality:
-                    FilterQuality.medium,
-                    gaplessPlayback: true,
-                    errorBuilder: (
-                        context,
-                        error,
-                        stackTrace,
-                        ) {
-                      return Container(
-                        color: surface,
-                        child: Center(
-                          child: Icon(
-                            Icons
-                                .broken_image_outlined,
-                            color: muted,
-                            size: 28.sp,
-                          ),
-                        ),
-                      );
-                    },
-                  )
-                else
-                  Container(
-                    color: surface,
-                  ),
-
-                // ==================================================
-                // OVERLAY
-                // ==================================================
-
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [
-                            0,
-                            .42,
-                            .72,
-                            1,
-                          ],
-                          colors: [
-                            background.withOpacity(.12),
-                            background.withOpacity(.02),
-                            background.withOpacity(.20),
-                            background.withOpacity(.96),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // ==================================================
-                // TOP
-                // ==================================================
-
-                Positioned(
-                  top: 16.h,
-                  left: 16.w,
-                  right: 16.w,
-                  child: Row(
-                    children: [
-                      _Pill(
-                        text: 'COLLECTION',
-                        background:
-                        surface.withOpacity(.72),
-                        foreground: primary,
-                        border: divider,
-                      ),
-                      const Spacer(),
-                      _Pill(
-                        text: '4K',
-                        background:
-                        surface.withOpacity(.72),
-                        foreground: primary,
-                        border: divider,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ==================================================
-                // SIDE LABEL
-                // ==================================================
-
-                Positioned(
-                  right: 17.w,
-                  top: 78.h,
-                  child: RotatedBox(
-                    quarterTurns: 1,
-                    child: Text(
-                      'FRAME 01',
-                      style: GoogleFonts.manrope(
-                        color:
-                        primary.withOpacity(.42),
-                        fontSize: 6.sp,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.8,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // ==================================================
-                // BOTTOM
-                // ==================================================
-
-                Positioned(
-                  left: 18.w,
-                  right: 18.w,
-                  bottom: 18.h,
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 6.w,
-                            height: 6.w,
-                            decoration: BoxDecoration(
-                              color: accent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                          Text(
-                            'SELECTED ATMOSPHERE',
-                            style: GoogleFonts.manrope(
-                              color: primary
-                                  .withOpacity(.68),
-                              fontSize: 7.sp,
-                              fontWeight:
-                              FontWeight.w800,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: 6.h),
-
-                      Text(
-                        title.toUpperCase(),
-                        maxLines: 2,
-                        overflow:
-                        TextOverflow.ellipsis,
-                        style: GoogleFonts.bebasNeue(
-                          color: primary,
-                          fontSize: 66.sp,
-                          height: .84,
-                          letterSpacing: .2,
-                        ),
-                      ),
-
-                      SizedBox(height: 11.h),
-
-                      Row(
-                        children: [
-                          Text(
-                            '${count.toString().padLeft(2, '0')} FRAMES',
-                            style: GoogleFonts.manrope(
-                              color: primary
-                                  .withOpacity(.58),
-                              fontSize: 7.sp,
-                              fontWeight:
-                              FontWeight.w800,
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          Container(
-                            width: 1,
-                            height: 12.h,
-                            color: primary
-                                .withOpacity(.22),
-                          ),
-                          SizedBox(width: 12.w),
-                          Text(
-                            '4K',
-                            style: GoogleFonts.manrope(
-                              color: primary
-                                  .withOpacity(.58),
-                              fontSize: 7.sp,
-                              fontWeight:
-                              FontWeight.w800,
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: 13.h),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 1,
-                              color: primary
-                                  .withOpacity(.18),
-                            ),
-                          ),
-                          SizedBox(width: 9.w),
-                          Container(
-                            width: 32.w,
-                            height: 32.w,
-                            decoration: BoxDecoration(
-                              color: surface
-                                  .withOpacity(.78),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: divider,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons
-                                  .arrow_outward_rounded,
-                              color: primary,
-                              size: 14.sp,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+SizedBox(
+width: gap,
+),
+],
+);
+}
 }
 
 // ============================================================================
-// PILL
+// ADAPTIVE GLASS BACK BUTTON
 // ============================================================================
 
-class _Pill extends StatelessWidget {
-  final String text;
-  final Color background;
-  final Color foreground;
-  final Color border;
+class _BackButton extends StatefulWidget {
+final VoidCallback onTap;
 
-  const _Pill({
-    required this.text,
-    required this.background,
-    required this.foreground,
-    required this.border,
-  });
+const _BackButton({
+required this.onTap,
+});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 10.w,
-        vertical: 7.h,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(
-          10.r,
-        ),
-        border: Border.all(
-          color: border,
-        ),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.manrope(
-          color: foreground,
-          fontSize: 6.5.sp,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1,
-        ),
-      ),
-    );
-  }
+@override
+State<_BackButton> createState() => _BackButtonState();
+}
+
+class _BackButtonState extends State<_BackButton> {
+bool _pressed = false;
+
+@override
+Widget build(BuildContext context) {
+final foreground = _GlassStyle.foreground(context);
+
+return AnimatedScale(
+scale: _pressed ? .92 : 1,
+duration: const Duration(
+milliseconds: 120,
+),
+curve: Curves.easeOutCubic,
+child: Material(
+color: Colors.transparent,
+child: InkWell(
+borderRadius: BorderRadius.circular(16.r),
+splashColor: foreground.withOpacity(.08),
+highlightColor: Colors.transparent,
+onTap: widget.onTap,
+onHighlightChanged: (value) {
+setState(() {
+_pressed = value;
+});
+},
+child: Ink(
+width: 46.w,
+height: 46.w,
+child: Icon(
+Hicons.left2LightOutline,
+color: foreground,
+size: 15.sp,
+),
+),
+),
+),
+);
+}
 }
 
 // ============================================================================
@@ -877,333 +623,390 @@ class _Pill extends StatelessWidget {
 // ============================================================================
 
 class _WallpaperCard extends StatefulWidget {
-  final String image;
-  final int index;
-  final String title;
+final String image;
+final int index;
 
-  final Color accent;
-  final Color surface;
-  final Color primary;
-  final Color muted;
-  final Color divider;
+final Color accent;
+final Color surface;
+final Color primary;
+final Color muted;
 
-  final VoidCallback onTap;
+final VoidCallback onTap;
 
-  const _WallpaperCard({
-    required this.image,
-    required this.index,
-    required this.title,
-    required this.accent,
-    required this.surface,
-    required this.primary,
-    required this.muted,
-    required this.divider,
-    required this.onTap,
-  });
+const _WallpaperCard({
+required this.image,
+required this.index,
+required this.accent,
+required this.surface,
+required this.primary,
+required this.muted,
+required this.onTap,
+});
 
-  @override
-  State<_WallpaperCard> createState() =>
-      _WallpaperCardState();
+@override
+State<_WallpaperCard> createState() => _WallpaperCardState();
 }
 
-class _WallpaperCardState
-    extends State<_WallpaperCard> {
-  bool _pressed = false;
+class _WallpaperCardState extends State<_WallpaperCard> {
+bool _pressed = false;
 
-  static const List<double> _heights = [
-    285,
-    340,
-    250,
-    320,
-    300,
-    350,
-  ];
+static const List<double> _heights = [
+285,
+340,
+250,
+320,
+300,
+350,
+];
 
-  @override
-  Widget build(BuildContext context) {
-    final height =
-        _heights[
-        widget.index % _heights.length
-        ].h;
+// ============================================================
+// RESOLUTION
+// ============================================================
 
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() {
-          _pressed = true;
-        });
-      },
-      onTapCancel: () {
-        setState(() {
-          _pressed = false;
-        });
-      },
-      onTapUp: (_) {
-        setState(() {
-          _pressed = false;
-        });
+String _wallpaperResolution(String url) {
+final value = url.toLowerCase();
 
-        widget.onTap();
-      },
-      child: AnimatedScale(
-        scale: _pressed ? .96 : 1,
-        duration: const Duration(
-          milliseconds: 110,
-        ),
-        curve: Curves.easeOutCubic,
-        child: Hero(
-          tag: widget.image,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(
-              22.r,
-            ),
-            child: SizedBox(
-              height: height,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // ==================================================
-                  // IMAGE
-                  // ==================================================
+if (RegExp(
+r'7680\s*[x×]\s*4320',
+).hasMatch(value)) {
+return '8K';
+}
 
-                  Image.network(
-                    widget.image,
-                    fit: BoxFit.cover,
-                    cacheWidth: 650,
-                    filterQuality: FilterQuality.low,
-                    gaplessPlayback: true,
-                    errorBuilder: (
-                        context,
-                        error,
-                        stackTrace,
-                        ) {
-                      return Container(
-                        color: widget.surface,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons
-                              .broken_image_outlined,
-                          color: widget.muted,
-                          size: 24.sp,
-                        ),
-                      );
-                    },
-                  ),
+if (RegExp(
+r'5120\s*[x×]\s*2880',
+).hasMatch(value)) {
+return '5K';
+}
 
-                  // ==================================================
-                  // OVERLAY
-                  // ==================================================
+if (RegExp(
+r'4096\s*[x×]\s*2160',
+).hasMatch(value)) {
+return '4K';
+}
 
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin:
-                            Alignment.topCenter,
-                            end:
-                            Alignment.bottomCenter,
-                            stops: const [
-                              0,
-                              .55,
-                              1,
-                            ],
-                            colors: [
-                              widget.surface
-                                  .withOpacity(.06),
-                              widget.surface
-                                  .withOpacity(.01),
-                              widget.surface
-                                  .withOpacity(.90),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+if (RegExp(
+r'3840\s*[x×]\s*2160',
+).hasMatch(value)) {
+return '4K';
+}
 
-                  // ==================================================
-                  // NUMBER
-                  // ==================================================
+if (RegExp(
+r'2560\s*[x×]\s*1440',
+).hasMatch(value)) {
+return '2K';
+}
 
-                  Positioned(
-                    top: 12.h,
-                    left: 12.w,
-                    child: Container(
-                      padding:
-                      EdgeInsets.symmetric(
-                        horizontal: 8.w,
-                        vertical: 6.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: widget.surface
-                            .withOpacity(.70),
-                        borderRadius:
-                        BorderRadius.circular(
-                          10.r,
-                        ),
-                        border: Border.all(
-                          color: widget.divider
-                              .withOpacity(.7),
-                        ),
-                      ),
-                      child: Text(
-                        (widget.index + 1)
-                            .toString()
-                            .padLeft(2, '0'),
-                        style:
-                        GoogleFonts.manrope(
-                          color: widget.primary,
-                          fontSize: 7.sp,
-                          fontWeight:
-                          FontWeight.w800,
-                          letterSpacing: .8,
-                        ),
-                      ),
-                    ),
-                  ),
+if (RegExp(
+r'2048\s*[x×]\s*1080',
+).hasMatch(value)) {
+return '2K';
+}
 
-                  // ==================================================
-                  // DOT
-                  // ==================================================
+if (RegExp(
+r'1920\s*[x×]\s*1080',
+).hasMatch(value)) {
+return 'FULL HD';
+}
 
-                  Positioned(
-                    top: 17.h,
-                    right: 17.w,
-                    child: Container(
-                      width: 7.w,
-                      height: 7.w,
-                      decoration: BoxDecoration(
-                        color: widget.accent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
+if (RegExp(
+r'1280\s*[x×]\s*720',
+).hasMatch(value)) {
+return 'HD';
+}
 
-                  // ==================================================
-                  // BOTTOM
-                  // ==================================================
+if (RegExp(
+r'\b8k\b',
+).hasMatch(value)) {
+return '8K';
+}
 
-                  Positioned(
-                    left: 14.w,
-                    right: 14.w,
-                    bottom: 14.h,
-                    child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '4K • ${widget.title.toUpperCase()}',
-                          maxLines: 1,
-                          overflow:
-                          TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            color: widget.primary
-                                .withOpacity(.55),
-                            fontSize: 6.5.sp,
-                            fontWeight:
-                            FontWeight.w800,
-                            letterSpacing: .8,
-                          ),
-                        ),
+if (RegExp(
+r'\b5k\b',
+).hasMatch(value)) {
+return '5K';
+}
 
-                        SizedBox(height: 5.h),
+if (RegExp(
+r'\b4k\b',
+).hasMatch(value)) {
+return '4K';
+}
 
-                        Text(
-                          'FRAME ${(widget.index + 1).toString().padLeft(2, '0')}',
-                          style:
-                          GoogleFonts.bebasNeue(
-                            color: widget.primary,
-                            fontSize: 26.sp,
-                            height: .9,
-                            letterSpacing: .2,
-                          ),
-                        ),
+if (RegExp(
+r'\b2k\b',
+).hasMatch(value)) {
+return '2K';
+}
 
-                        SizedBox(height: 8.h),
+if (RegExp(
+r'\b1k\b',
+).hasMatch(value)) {
+return '1K';
+}
 
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: widget.primary
-                                    .withOpacity(.18),
-                              ),
-                            ),
-                            SizedBox(width: 8.w),
-                            Icon(
-                              Icons
-                                  .arrow_outward_rounded,
-                              color: widget.primary
-                                  .withOpacity(.65),
-                              size: 13.sp,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+if (RegExp(
+r'\b(full[\s_-]?hd|fhd)\b',
+).hasMatch(value)) {
+return 'FULL HD';
+}
+
+if (RegExp(
+r'\bhd\b',
+).hasMatch(value)) {
+return 'HD';
+}
+
+if (RegExp(
+r'\b2160p\b',
+).hasMatch(value)) {
+return '4K';
+}
+
+if (RegExp(
+r'\b1440p\b',
+).hasMatch(value)) {
+return '2K';
+}
+
+if (RegExp(
+r'\b1080p\b',
+).hasMatch(value)) {
+return 'FULL HD';
+}
+
+if (RegExp(
+r'\b720p\b',
+).hasMatch(value)) {
+return 'HD';
+}
+
+return 'HD';
+}
+
+@override
+Widget build(BuildContext context) {
+final height =
+_heights[
+widget.index % _heights.length
+].h;
+
+final resolution = _wallpaperResolution(
+widget.image,
+);
+
+final glassForeground =
+_GlassStyle.foreground(context);
+
+return GestureDetector(
+onTapDown: (_) {
+setState(() {
+_pressed = true;
+});
+
+HapticFeedback.selectionClick();
+},
+onTapCancel: () {
+setState(() {
+_pressed = false;
+});
+},
+onTapUp: (_) {
+setState(() {
+_pressed = false;
+});
+
+widget.onTap();
+},
+child: AnimatedScale(
+scale: _pressed ? .965 : 1,
+duration: const Duration(
+milliseconds: 150,
+),
+curve: Curves.easeOutCubic,
+child: AnimatedContainer(
+duration: const Duration(
+milliseconds: 150,
+),
+curve: Curves.easeOutCubic,
+decoration: BoxDecoration(
+borderRadius: BorderRadius.circular(24.r),
+boxShadow: [
+BoxShadow(
+color: Colors.black.withOpacity(
+_pressed ? .025 : .055,
+),
+blurRadius: _pressed ? 8 : 18,
+offset: Offset(
+0,
+_pressed ? 3 : 8,
+),
+),
+],
+),
+child: ClipRRect(
+borderRadius: BorderRadius.circular(24.r),
+child: SizedBox(
+height: height,
+child: Stack(
+fit: StackFit.expand,
+children: [
+// ==================================================
+// IMAGE
+// ==================================================
+
+Image.network(
+widget.image,
+fit: BoxFit.cover,
+cacheWidth: 700,
+filterQuality: FilterQuality.medium,
+gaplessPlayback: true,
+errorBuilder: (
+context,
+error,
+stackTrace,
+) {
+return Container(
+color: widget.surface,
+alignment: Alignment.center,
+child: Icon(
+Icons.broken_image_outlined,
+color: widget.muted,
+size: 25.sp,
+),
+);
+},
+),
+
+// ==================================================
+// SUBTLE IMAGE GRADIENT
+// ==================================================
+
+Positioned.fill(
+child: IgnorePointer(
+child: DecoratedBox(
+decoration: BoxDecoration(
+gradient: LinearGradient(
+begin: Alignment.topCenter,
+end: Alignment.bottomCenter,
+stops: const [
+0,
+.65,
+1,
+],
+colors: [
+Colors.black.withOpacity(.02),
+Colors.transparent,
+Colors.black.withOpacity(.13),
+],
+),
+),
+),
+),
+),
+
+// ==================================================
+// ADAPTIVE GLASS RESOLUTION PILL
+// ==================================================
+
+Positioned(
+top: 11.h,
+left: 11.w,
+child: _GlassResolutionPill(
+text: resolution,
+),
+),
+
+// ==================================================
+// ADAPTIVE GLASS OPEN BUTTON
+// ==================================================
+
+Positioned(
+right: 11.w,
+bottom: 11.h,
+child: AnimatedContainer(
+duration: const Duration(
+milliseconds: 140,
+),
+width: _pressed ? 34.w : 38.w,
+height: _pressed ? 34.w : 38.w,
+decoration: BoxDecoration(
+color: _pressed
+? _GlassStyle.pressedBackground(
+context,
+)
+    : _GlassStyle.background(
+context,
+),
+shape: BoxShape.circle,
+border: Border.all(
+color: _GlassStyle.border(
+context,
+),
+width: .7,
+),
+boxShadow:
+_GlassStyle.shadow(
+context,
+),
+),
+child: Icon(
+Icons.arrow_outward_rounded,
+color: glassForeground,
+size: 15.sp,
+),
+),
+),
+],
+),
+),
+),
+),
+),
+);
+}
 }
 
 // ============================================================================
-// CIRCLE BUTTON
+// GLASS RESOLUTION PILL
 // ============================================================================
 
-class _CircleButton extends StatelessWidget {
-  final IconData icon;
+class _GlassResolutionPill extends StatelessWidget {
+final String text;
 
-  final Color background;
-  final Color border;
-  final Color foreground;
+const _GlassResolutionPill({
+required this.text,
+});
 
-  final VoidCallback onTap;
+@override
+Widget build(BuildContext context) {
+final foreground =
+_GlassStyle.foreground(context);
 
-  const _CircleButton({
-    required this.icon,
-    required this.background,
-    required this.border,
-    required this.foreground,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(
-          16.r,
-        ),
-        child: Ink(
-          width: 46.w,
-          height: 46.w,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(
-              16.r,
-            ),
-            border: Border.all(
-              color: border,
-            ),
-          ),
-          child: Icon(
-            icon,
-            color: foreground,
-            size: 15.sp,
-          ),
-        ),
-      ),
-    );
-  }
+return Container(
+padding: EdgeInsets.symmetric(
+horizontal: 9.w,
+vertical: 6.h,
+),
+decoration: BoxDecoration(
+color: _GlassStyle.background(context),
+borderRadius: BorderRadius.circular(10.r),
+border: Border.all(
+color: _GlassStyle.border(context),
+width: .7,
+),
+boxShadow: _GlassStyle.shadow(context),
+),
+child: Text(
+text,
+style: GoogleFonts.googleSansFlex(
+color: foreground,
+fontSize: 6.5.sp,
+fontWeight: FontWeight.w400,
+letterSpacing: .8,
+),
+),
+);
+}
 }
 
 // ============================================================================
@@ -1211,92 +1014,193 @@ class _CircleButton extends StatelessWidget {
 // ============================================================================
 
 class _EmptyState extends StatelessWidget {
-  final Color primary;
-  final Color secondary;
-  final Color accent;
+final Color primary;
+final Color muted;
+final Color accent;
 
-  const _EmptyState({
-    required this.primary,
-    required this.secondary,
-    required this.accent,
-  });
+const _EmptyState({
+required this.primary,
+required this.muted,
+required this.accent,
+});
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment:
-        MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 60.w,
-            height: 60.w,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.image_not_supported_outlined,
-              color: accent,
-              size: 25.sp,
-            ),
-          ),
-          SizedBox(height: 15.h),
-          Text(
-            'EMPTY COLLECTION',
-            style: GoogleFonts.bebasNeue(
-              color: primary,
-              fontSize: 25.sp,
-            ),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            'Nothing here yet.',
-            style: GoogleFonts.manrope(
-              color: secondary,
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+@override
+Widget build(BuildContext context) {
+return Center(
+child: Column(
+mainAxisAlignment: MainAxisAlignment.center,
+children: [
+Container(
+width: 62.w,
+height: 62.w,
+decoration: BoxDecoration(
+color: accent.withOpacity(.08),
+shape: BoxShape.circle,
+),
+child: Icon(
+Icons.image_not_supported_outlined,
+color: accent,
+size: 26.sp,
+),
+),
+
+SizedBox(
+height: 15.h,
+),
+
+Text(
+'EMPTY',
+style: GoogleFonts.bebasNeue(
+color: primary,
+fontSize: 27.sp,
+height: .9,
+),
+),
+
+SizedBox(
+height: 5.h,
+),
+
+Text(
+'Nothing here yet.',
+style: GoogleFonts.googleSansFlex(
+color: muted,
+fontSize: 10.sp,
+fontWeight: FontWeight.w400,
+),
+),
+],
+),
+);
+}
 }
 
 // ============================================================================
-// END
+// END MARK
 // ============================================================================
 
 class _EndMark extends StatelessWidget {
-  final Color divider;
-  final Color muted;
+final Color divider;
+final Color muted;
 
-  const _EndMark({
-    required this.divider,
-    required this.muted,
-  });
+const _EndMark({
+required this.divider,
+required this.muted,
+});
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 30.w,
-          height: 1,
-          color: divider,
-        ),
-        SizedBox(height: 10.h),
-        Text(
-          'END',
-          style: GoogleFonts.manrope(
-            color: muted.withOpacity(.35),
-            fontSize: 6.sp,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 2,
-          ),
-        ),
-      ],
-    );
-  }
+@override
+Widget build(BuildContext context) {
+return Column(
+children: [
+Container(
+width: 30.w,
+height: 1,
+color: divider,
+),
+
+SizedBox(
+height: 10.h,
+),
+
+Text(
+'END',
+style: GoogleFonts.googleSansFlex(
+color: muted.withOpacity(.35),
+fontSize: 6.sp,
+fontWeight: FontWeight.w500,
+letterSpacing: 2,
+),
+),
+],
+);
+}
+}
+
+// ============================================================================
+// ADAPTIVE GLASS COUNT PILL
+// ============================================================================
+
+class _GlassCountPill extends StatelessWidget {
+final int count;
+
+const _GlassCountPill({
+required this.count,
+});
+
+@override
+Widget build(BuildContext context) {
+final foreground =
+_GlassStyle.foreground(context);
+
+return Container(
+padding: EdgeInsets.symmetric(
+horizontal: 13.w,
+vertical: 9.h,
+),
+decoration: BoxDecoration(
+color: _GlassStyle.background(context),
+borderRadius: BorderRadius.circular(14.r),
+border: Border.all(
+color: _GlassStyle.border(context),
+width: .8,
+),
+boxShadow: _GlassStyle.shadow(context),
+),
+child: Row(
+mainAxisSize: MainAxisSize.min,
+children: [
+// --------------------------------------------------------
+// DOT
+// --------------------------------------------------------
+
+Container(
+width: 5.w,
+height: 5.w,
+decoration: BoxDecoration(
+color: foreground.withOpacity(.55),
+shape: BoxShape.circle,
+),
+),
+
+SizedBox(
+width: 7.w,
+),
+
+// --------------------------------------------------------
+// COUNT
+// --------------------------------------------------------
+
+Text(
+count.toString().padLeft(2, '0'),
+style: GoogleFonts.googleSansFlex(
+color: foreground,
+fontSize: 9.sp,
+fontWeight: FontWeight.w500,
+letterSpacing: .4,
+),
+),
+
+SizedBox(
+width: 5.w,
+),
+
+// --------------------------------------------------------
+// LABEL
+// --------------------------------------------------------
+
+Text(
+'WALLPAPERS',
+style: GoogleFonts.googleSansFlex(
+color: _GlassStyle.mutedForeground(
+context,
+),
+fontSize: 6.sp,
+fontWeight: FontWeight.w400,
+letterSpacing: .8,
+),
+),
+],
+),
+);
+}
 }

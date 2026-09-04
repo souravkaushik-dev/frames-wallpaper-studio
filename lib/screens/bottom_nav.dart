@@ -121,7 +121,7 @@ class _MainScreenState extends State<MainScreen> {
     // =======================================================================
 
       case 3:
-        return DesktopPage(
+        return WidePage(
         );
 
     // =======================================================================
